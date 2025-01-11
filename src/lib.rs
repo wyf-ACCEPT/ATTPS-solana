@@ -27,6 +27,9 @@ pub fn process_instruction(
             process_initialize_counter(program_id, accounts, initial_value)?
         }
         CounterInstruction::IncrementCounter => process_increment_counter(program_id, accounts)?,
+        CounterInstruction::AddAnyValue { amount } => {
+            process_add_any_value(program_id, accounts, amount)?
+        }
     };
     Ok(())
 }
@@ -115,11 +118,40 @@ fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> P
     msg!("Counter incremented to: {}", counter_data.count);
     Ok(())
 }
+
+fn process_add_any_value(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+    let counter_account = next_account_info(accounts_iter)?;
+
+    // Verify account ownership
+    if counter_account.owner != program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    // Mutable borrow the account data
+    let mut data = counter_account.data.borrow_mut();
+
+    // Deserialize the account data into our CounterAccount struct
+    let mut counter_data: CounterAccount = CounterAccount::try_from_slice(&data)?;
+
+    // Add the specified amount to the counter value
+    counter_data.count = counter_data
+        .count
+        .checked_add(amount)
+        .ok_or(ProgramError::InvalidAccountData)?;
+
+    // Serialize the updated counter data back into the account
+    counter_data.serialize(&mut &mut data[..])?;
+
+    msg!("Counter increased by {} to {}", amount, counter_data.count);
+    Ok(())
+}
  
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum CounterInstruction {
     InitializeCounter { initial_value: u64 }, // variant 0
     IncrementCounter,                         // variant 1
+    AddAnyValue { amount: u64 },              // variant 2
 }
  
 impl CounterInstruction {
@@ -140,6 +172,14 @@ impl CounterInstruction {
                 Ok(Self::InitializeCounter { initial_value })
             }
             1 => Ok(Self::IncrementCounter), // No additional data needed
+            2 => {
+                // For AddAnyValue, parse a u64 from the remaining bytes
+                let amount = u64::from_le_bytes(
+                    rest.try_into()
+                        .map_err(|_| ProgramError::InvalidInstructionData)?,
+                );
+                Ok(Self::AddAnyValue { amount })
+            }
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
