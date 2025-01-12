@@ -14,3 +14,8 @@ solana-program = "1.18.26"
 solana-program-test = "1.18.26"
 solana-sdk = "1.18.26"
 tokio = "1.43.0"
+
+[lints.clippy]
+enum_glob_use = "deny"
+suspicious = "warn"
+unsafe_code = "forbid"

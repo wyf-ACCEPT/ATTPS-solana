@@ -1,5 +1,9 @@
 #[cfg(test)]
 mod test {
+    use crate::processor::process_instruction;
+    use crate::state::CounterAccount;
+    use borsh::BorshDeserialize;
+    use solana_program::pubkey::Pubkey;
     use solana_program_test::*;
     use solana_sdk::{
         instruction::{AccountMeta, Instruction},
@@ -7,21 +11,14 @@ mod test {
         system_program,
         transaction::Transaction,
     };
-    use borsh::BorshDeserialize;
-    use solana_program::pubkey::Pubkey;
-    use crate::processor::process_instruction;
-    use crate::state::CounterAccount;
 
     #[tokio::test]
     async fn test_counter_program() {
         let program_id = Pubkey::new_unique();
-        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
-            "attps_solana",
-            program_id,
-            processor!(process_instruction),
-        )
-        .start()
-        .await;
+        let (mut banks_client, payer, recent_blockhash) =
+            ProgramTest::new("attps_solana", program_id, processor!(process_instruction))
+                .start()
+                .await;
 
         // Create a new keypair to use as the address for our counter account
         let counter_keypair = Keypair::new();

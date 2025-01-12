@@ -1,4 +1,3 @@
- 
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_error::ProgramError;
 
@@ -8,14 +7,14 @@ pub enum CounterInstruction {
     IncrementCounter,                         // variant 1
     AddAnyValue { amount: u64 },              // variant 2
 }
- 
+
 impl CounterInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         // Get the instruction variant from the first byte
         let (&variant, rest) = input
             .split_first()
             .ok_or(ProgramError::InvalidInstructionData)?;
- 
+
         // Match instruction type and parse the remaining bytes based on the variant
         match variant {
             0 => {
