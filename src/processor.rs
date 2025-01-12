@@ -2,21 +2,39 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
-    msg,
     program::invoke,
     program_error::ProgramError,
     pubkey::Pubkey,
     system_instruction,
     sysvar::{rent::Rent, Sysvar},
+    msg,
 };
+use crate::instructions::CounterInstruction;
+use crate::state::CounterAccount;
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
-pub struct CounterAccount {
-    pub count: u64,
+pub fn process_instruction(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    // Unpack instruction data
+    let instruction = CounterInstruction::unpack(instruction_data)?;
+ 
+    // Match instruction type
+    match instruction {
+        CounterInstruction::InitializeCounter { initial_value } => {
+            process_initialize_counter(program_id, accounts, initial_value)?
+        }
+        CounterInstruction::IncrementCounter => process_increment_counter(program_id, accounts)?,
+        CounterInstruction::AddAnyValue { amount } => {
+            process_add_any_value(program_id, accounts, amount)?
+        }
+    };
+    Ok(())
 }
 
 // Initialize a new counter account
-pub fn process_initialize_counter(
+fn process_initialize_counter(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     initial_value: u64,
@@ -67,7 +85,7 @@ pub fn process_initialize_counter(
 }
 
 // Update an existing counter's value
-pub fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let counter_account = next_account_info(accounts_iter)?;
  
@@ -95,7 +113,7 @@ pub fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) 
     Ok(())
 }
 
-pub fn process_add_any_value(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+fn process_add_any_value(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -> ProgramResult {
     let accounts_iter = &mut accounts.iter();
     let counter_account = next_account_info(accounts_iter)?;
 
