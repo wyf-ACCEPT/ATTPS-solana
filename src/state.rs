@@ -1,4 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::pubkey::Pubkey;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct CounterAccount {
@@ -30,4 +31,48 @@ pub struct AgentHeader {
     pub message_type: MessageType,
     pub priority: Priority,
     pub ttl: u64,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct Proofs {
+    pub zk_proof: Vec<u8>,
+    pub merkle_proof: Vec<u8>,
+    pub signature_proof: Vec<u8>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct Metadata {
+    pub content_type: String,
+    pub encoding: String,
+    pub compression: String,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct MessagePayload {
+    pub data: Vec<u8>,
+    pub data_hash: [u8; 32],
+    pub proofs: Proofs,
+    pub metadata: Metadata,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct AgentSettings {
+    pub signers: Vec<Pubkey>,
+    pub threshold: u8,
+    pub converter_address: Pubkey,
+    pub agent_header: AgentHeader,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct AgentConfig {
+    pub config_digest: [u8; 32],
+    pub config_block_number: u32,
+    pub is_active: bool,
+    pub settings: AgentSettings,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct AgentConfigState {
+    pub latest_config_digest: [u8; 32],
+    pub configs: Vec<AgentConfig>,
 }
