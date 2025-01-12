@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test {
-    use crate::processor::process_instruction;
-    use crate::state::CounterAccount;
-    use borsh::BorshDeserialize;
+    use crate::state::{CounterAccount, MessageType, Priority};
+    use crate::{processor::process_instruction, state::AgentHeader};
+    use borsh::{BorshDeserialize, BorshSerialize};
     use solana_program::pubkey::Pubkey;
     use solana_program_test::*;
     use solana_sdk::{
@@ -11,6 +11,36 @@ mod test {
         system_program,
         transaction::Transaction,
     };
+
+    #[test]
+    fn test_agent_header_serialization() {
+        let header = AgentHeader {
+            version: "1.0.0".to_string(),
+            message_id: "msg123".to_string(),
+            source_agent_id: "agent1".to_string(),
+            source_agent_name: "TestAgent".to_string(),
+            target_agent_id: "agent2".to_string(),
+            timestamp: 1234567890,
+            message_type: MessageType::Response,
+            priority: Priority::Low,
+            ttl: 3600,
+        };
+
+        let mut buffer = vec![0u8; 300];
+        header
+            .serialize(&mut &mut buffer[..])
+            .expect("Failed to serialize");
+
+        println!("\nSerialized bytes: {:?}", buffer);
+        println!("Serialized length: {} bytes", buffer.len());
+        // let deserialized = AgentHeader::try_from_slice(&buffer).expect("Failed to deserialize");
+        // println!("✅ AgentHeader deserialized successfully: {:?}", deserialized);
+
+        // assert_eq!(header.version, deserialized.version);
+        // assert_eq!(header.message_id, deserialized.message_id);
+        // assert_eq!(header.timestamp, deserialized.timestamp);
+
+    }
 
     #[tokio::test]
     async fn test_counter_program() {
