@@ -1,4 +1,4 @@
-use crate::instructions::CounterInstruction;
+use crate::instruction::CounterInstruction;
 use crate::state::CounterAccount;
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{

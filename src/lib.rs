@@ -1,5 +1,5 @@
 mod entrypoint;
-mod instructions;
+mod instruction;
 mod processor;
 mod state;
 mod test;
