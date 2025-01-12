@@ -5,21 +5,21 @@ pub struct CounterAccount {
     pub count: u64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum MessageType {
     Request,
     Response,
     Event,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum Priority {
     High,
     Medium,
     Low,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentHeader {
     pub version: String,
     pub message_id: String,
@@ -31,4 +31,3 @@ pub struct AgentHeader {
     pub priority: Priority,
     pub ttl: u64,
 }
-
