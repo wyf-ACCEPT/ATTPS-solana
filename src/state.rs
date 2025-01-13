@@ -44,6 +44,16 @@ pub struct AgentHeader {
     pub ttl: u64,
 }
 
+/// A collection of cryptographic proofs used for verification.
+///
+/// # Size
+///
+/// Each Vec<u8> field requires 4 bytes for length + the content length.
+/// - zk_proof: (4 + zk_proof.len()) bytes
+/// - merkle_proof: (4 + merkle_proof.len()) bytes
+/// - signature_proof: (4 + signature_proof.len()) bytes
+/// 
+/// Total size = 12 + (zk_proof.len() + merkle_proof.len() + signature_proof.len())
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct Proofs {
     pub zk_proof: Vec<u8>,
@@ -51,6 +61,16 @@ pub struct Proofs {
     pub signature_proof: Vec<u8>,
 }
 
+/// Metadata information about the message content.
+///
+/// # Size
+///
+/// Each String field requires 4 bytes for length + the content length.
+/// - content_type: (4 + content_type.len()) bytes
+/// - encoding: (4 + encoding.len()) bytes
+/// - compression: (4 + compression.len()) bytes
+/// 
+/// Total size = 12 + (content_type.len() + encoding.len() + compression.len())
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct Metadata {
     pub content_type: String,
@@ -58,6 +78,19 @@ pub struct Metadata {
     pub compression: String,
 }
 
+/// The main payload of a message, containing data and associated metadata.
+///
+/// # Size
+///
+/// Fixed size components:
+/// - data_hash: 32 bytes ([u8; 32])
+/// 
+/// Variable size components:
+/// - data: (4 + data.len()) bytes
+/// - proofs: See Proofs struct size calculation
+/// - metadata: See Metadata struct size calculation
+/// 
+/// Total size = 36 + data.len() + proofs_size + metadata_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct MessagePayload {
     pub data: Vec<u8>,
@@ -66,6 +99,19 @@ pub struct MessagePayload {
     pub metadata: Metadata,
 }
 
+/// Settings configuration for an agent.
+///
+/// # Size
+///
+/// Fixed size components:
+/// - threshold: 1 byte (u8)
+/// - converter_address: 32 bytes (Pubkey)
+/// 
+/// Variable size components:
+/// - signers: (4 + 32*signers.len()) bytes (Vec<Pubkey>)
+/// - agent_header: See AgentHeader struct size calculation
+/// 
+/// Total size = 37 + (32*signers.len()) + agent_header_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentSettings {
     pub signers: Vec<Pubkey>,
@@ -74,6 +120,19 @@ pub struct AgentSettings {
     pub agent_header: AgentHeader,
 }
 
+/// Configuration for an agent including its settings and status.
+///
+/// # Size
+///
+/// Fixed size components:
+/// - config_digest: 32 bytes ([u8; 32])
+/// - config_block_number: 4 bytes (u32)
+/// - is_active: 1 byte (bool)
+/// 
+/// Nested components:
+/// - settings: See AgentSettings struct size calculation
+/// 
+/// Total size = 37 + settings_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentConfig {
     pub config_digest: [u8; 32],
@@ -82,6 +141,18 @@ pub struct AgentConfig {
     pub settings: AgentSettings,
 }
 
+/// State container for agent configurations.
+///
+/// # Size
+///
+/// Fixed size components:
+/// - latest_config_digest: 32 bytes ([u8; 32])
+/// 
+/// Variable size components:
+/// - configs: (4 + configs.len()*config_size) bytes
+///   where config_size is the size of AgentConfig
+/// 
+/// Total size = 36 + (configs.len() * config_size)
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentConfigState {
     pub latest_config_digest: [u8; 32],
