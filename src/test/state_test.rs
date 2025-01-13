@@ -105,7 +105,8 @@ mod state_test {
         };
 
         let serialized = borsh::to_vec(&payload).expect("Failed to serialize");
-        let deserialized = MessagePayload::try_from_slice(&serialized).expect("Failed to deserialize");
+        let deserialized =
+            MessagePayload::try_from_slice(&serialized).expect("Failed to deserialize");
 
         println!(
             "📝 MessagePayload serialized bytes (length ~ {} bytes): {:?}\n\
@@ -118,7 +119,10 @@ mod state_test {
         assert_eq!(payload.data, deserialized.data);
         assert_eq!(payload.data_hash, deserialized.data_hash);
         assert_eq!(payload.proofs.zk_proof, deserialized.proofs.zk_proof);
-        assert_eq!(payload.metadata.content_type, deserialized.metadata.content_type);
+        assert_eq!(
+            payload.metadata.content_type,
+            deserialized.metadata.content_type
+        );
     }
 
     #[test]
@@ -141,7 +145,8 @@ mod state_test {
         };
 
         let serialized = borsh::to_vec(&settings).expect("Failed to serialize");
-        let deserialized = AgentSettings::try_from_slice(&serialized).expect("Failed to deserialize");
+        let deserialized =
+            AgentSettings::try_from_slice(&serialized).expect("Failed to deserialize");
 
         println!(
             "📝 AgentSettings serialized bytes (length ~ {} bytes): {:?}\n\
@@ -154,7 +159,10 @@ mod state_test {
         assert_eq!(settings.signers, deserialized.signers);
         assert_eq!(settings.threshold, deserialized.threshold);
         assert_eq!(settings.converter_address, deserialized.converter_address);
-        assert_eq!(settings.agent_header.version, deserialized.agent_header.version);
+        assert_eq!(
+            settings.agent_header.version,
+            deserialized.agent_header.version
+        );
     }
 
     #[test]
@@ -226,7 +234,8 @@ mod state_test {
         };
 
         let serialized = borsh::to_vec(&config_state).expect("Failed to serialize");
-        let deserialized = AgentConfigState::try_from_slice(&serialized).expect("Failed to deserialize");
+        let deserialized =
+            AgentConfigState::try_from_slice(&serialized).expect("Failed to deserialize");
 
         println!(
             "📝 AgentConfigState serialized bytes (length ~ {} bytes): {:?}\n\
@@ -236,8 +245,14 @@ mod state_test {
             deserialized
         );
 
-        assert_eq!(config_state.latest_config_digest, deserialized.latest_config_digest);
+        assert_eq!(
+            config_state.latest_config_digest,
+            deserialized.latest_config_digest
+        );
         assert_eq!(config_state.configs.len(), deserialized.configs.len());
-        assert_eq!(config_state.configs[0].config_digest, deserialized.configs[0].config_digest);
+        assert_eq!(
+            config_state.configs[0].config_digest,
+            deserialized.configs[0].config_digest
+        );
     }
 }
