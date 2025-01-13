@@ -1,6 +1,9 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::program_error::ProgramError;
 
+use crate::state::{AgentSettings, MessagePayload};
+
+#[deprecated]
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum CounterInstruction {
     InitializeCounter { initial_value: u64 }, // variant 0
@@ -36,5 +39,48 @@ impl CounterInstruction {
             }
             _ => Err(ProgramError::InvalidInstructionData),
         }
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum AgentInstruction {
+    Initialize,
+
+    CreateAgent,
+
+    RegisterAgent {
+        agent_settings: AgentSettings,
+    },
+
+    CreateAndRegisterAgent {
+        agent_settings: AgentSettings,
+    },
+
+    ChangeAgentSettingProposal {
+        agent_id: u128,
+        agent_settings: AgentSettings,
+    },
+
+    Verify {
+        settings_digest: [u8; 32],
+        payload: MessagePayload,
+    },
+
+    AcceptAgent {
+        agent_id: u128,
+    },
+
+    AcceptAgentSettingProposal {
+        agent_id: u128,
+    },
+
+    RemoveAgent {
+        agent_id: u128,
+    },
+}
+
+impl AgentInstruction {
+    pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
+        todo!()
     }
 }
