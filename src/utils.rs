@@ -121,11 +121,6 @@ pub fn verify_signature(
             return Err(VerificationError::SignerNotAllowed.into());
         }
 
-        // Check for duplicate signers
-        if address_exists(&valid_signers, &recovered_address) {
-            return Err(VerificationError::DuplicateSigner.into());
-        }
-
         valid_signers.push(recovered_address);
     }
 
