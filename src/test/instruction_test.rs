@@ -1,4 +1,3 @@
-use crate::processor::process_instruction;
 use crate::state::CounterAccount;
 use borsh::BorshDeserialize;
 use solana_program::pubkey::Pubkey;
@@ -14,11 +13,13 @@ use solana_sdk::{
 mod instruction_test {
     use super::*;
 
+    /// This test is for reference. Will be removed in the future.
     #[tokio::test]
     async fn test_counter_program() {
+        use crate::processor::process_instruction_counter;
         let program_id = Pubkey::new_unique();
         let (mut banks_client, payer, recent_blockhash) =
-            ProgramTest::new("attps_solana", program_id, processor!(process_instruction))
+            ProgramTest::new("attps_solana", program_id, processor!(process_instruction_counter))
                 .start()
                 .await;
 

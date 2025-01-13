@@ -1,8 +1,8 @@
 use crate::state::{
-    AgentConfig, AgentConfigState, AgentHeader, AgentSettings, CounterAccount, MessagePayload,
+    AgentConfig, AgentConfigState, AgentHeader, AgentSettings, MessagePayload,
     MessageType, Metadata, Priority, Proofs,
 };
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshDeserialize;
 use solana_program::pubkey::Pubkey;
 
 #[cfg(test)]

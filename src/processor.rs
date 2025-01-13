@@ -17,6 +17,16 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    Ok(())
+}
+
+/// This function is only for reference. Will be removed in the future.
+#[deprecated]
+pub fn process_instruction_counter(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
     // Unpack instruction data
     let instruction = CounterInstruction::unpack(instruction_data)?;
 
