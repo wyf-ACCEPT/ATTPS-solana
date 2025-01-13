@@ -69,14 +69,24 @@ pub fn verify_signature(
     }
 
     let sig_count = signature_proof.len() / 65;
+    let mut seen_signatures = Vec::new();
 
-    // Check threshold before processing signatures
+    // Check for duplicate signatures first
+    for i in 0..sig_count {
+        let start = i * 65;
+        let sig = &signature_proof[start..start + 65];
+        if seen_signatures.contains(&sig.to_vec()) {
+            return Err(VerificationError::DuplicateSigner.into());
+        }
+        seen_signatures.push(sig.to_vec());
+    }
+
+    // Check threshold after duplicate check
     if sig_count < threshold as usize {
         return Err(VerificationError::InvalidThreshold.into());
     }
 
     let mut valid_signers = Vec::new();
-    let mut seen_signatures = Vec::new();
 
     // Process each signature
     for i in 0..sig_count {
@@ -89,16 +99,6 @@ pub fn verify_signature(
         let r = &signature_proof[start..start + 32];
         let s = &signature_proof[start + 32..start + 64];
         let v = signature_proof[start + 64];
-
-        // Check for duplicate signatures by comparing raw components
-        let mut current_sig = Vec::with_capacity(65);
-        current_sig.extend_from_slice(r);
-        current_sig.extend_from_slice(s);
-        current_sig.push(v);
-        if seen_signatures.contains(&current_sig) {
-            return Err(VerificationError::DuplicateSigner.into());
-        }
-        seen_signatures.push(current_sig);
 
         // Combine r and s into signature for recovery
         let mut signature = Vec::with_capacity(64);
@@ -121,7 +121,17 @@ pub fn verify_signature(
             return Err(VerificationError::SignerNotAllowed.into());
         }
 
+        // Check for duplicate signers
+        if address_exists(&valid_signers, &recovered_address) {
+            return Err(VerificationError::DuplicateSigner.into());
+        }
+
         valid_signers.push(recovered_address);
+    }
+
+    // Check threshold after processing all valid signatures
+    if valid_signers.len() < threshold as usize {
+        return Err(VerificationError::InvalidThreshold.into());
     }
 
     Ok(())
