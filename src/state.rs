@@ -20,6 +20,17 @@ pub enum Priority {
     Low,
 }
 
+/// A message header containing routing and metadata information for agent communication.
+///
+/// The header includes versioning, identifiers, timestamps, and message characteristics
+/// used for routing and processing messages between agents.
+///
+/// # Size
+///
+/// Total size in bytes = 38 + <sum of all string lengths>, where:
+/// - Each string field adds (4 + content length) bytes
+/// - Fixed fields add (8 + 1 + 1 + 8 = 18) bytes (timestamps, enums, etc)
+/// 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentHeader {
     pub version: String,
