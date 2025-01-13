@@ -128,7 +128,7 @@ mod state_test {
     #[test]
     fn test_agent_settings_serialization() {
         let settings = AgentSettings {
-            signers: vec![Pubkey::new_unique(), Pubkey::new_unique()],
+            signers: vec![[1; 20], [3; 20]],
             threshold: 2,
             converter_address: Pubkey::new_unique(),
             agent_header: AgentHeader {
@@ -172,7 +172,7 @@ mod state_test {
             config_block_number: 12345,
             is_active: true,
             settings: AgentSettings {
-                signers: vec![Pubkey::new_unique()],
+                signers: vec![[1; 20]],
                 threshold: 1,
                 converter_address: Pubkey::new_unique(),
                 agent_header: AgentHeader {
@@ -215,7 +215,7 @@ mod state_test {
                 config_block_number: 12345,
                 is_active: true,
                 settings: AgentSettings {
-                    signers: vec![Pubkey::new_unique()],
+                    signers: vec![[1; 20]],
                     threshold: 1,
                     converter_address: Pubkey::new_unique(),
                     agent_header: AgentHeader {

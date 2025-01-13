@@ -108,13 +108,13 @@ pub struct MessagePayload {
 /// - converter_address: 32 bytes (Pubkey)
 ///
 /// Variable size components:
-/// - signers: (4 + 32*signers.len()) bytes (Vec<Pubkey>)
+/// - signers: (4 + 20*signers.len()) bytes (Vec<[u8; 20]> for Ethereum addresses)
 /// - agent_header: See AgentHeader struct size calculation
 ///
-/// Total size = 37 + (32*signers.len()) + agent_header_size
+/// Total size = 37 + (20*signers.len()) + agent_header_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentSettings {
-    pub signers: Vec<Pubkey>,
+    pub signers: Vec<[u8; 20]>,
     pub threshold: u8,
     pub converter_address: Pubkey,
     pub agent_header: AgentHeader,
