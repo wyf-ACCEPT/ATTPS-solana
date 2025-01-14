@@ -1,15 +1,26 @@
-use crate::utils::{
-    address_add, address_exists, verify_merkle, verify_signature, verify_zk,
-    VerificationError,
-};
-use solana_program::{
-    program_error::ProgramError,
-    secp256k1_recover::Secp256k1Pubkey,
-};
-
 #[cfg(test)]
 mod utils_test {
-    use super::*;
+
+    use crate::utils::{
+        address_exists, address_pushback, pubkey_to_eth_address, verify_merkle, verify_signature,
+        verify_zk, VerificationError,
+    };
+    use solana_program::{program_error::ProgramError, secp256k1_recover::Secp256k1Pubkey};
+
+    #[test]
+    fn test_pubkey_to_eth_address() {
+        let pubkey = Secp256k1Pubkey::new(
+            &hex::decode(
+                "5139c6f948e38d3ffa36df836016aea08f37a940a91323f2a785d17be4353e38\
+                2b488d0c543c505ec40046afbb2543ba6bb56ca4e26dc6abee13e9add6b7e189",
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            Vec::from(pubkey_to_eth_address(&pubkey)),
+            hex::decode("052c7707093534035fc2ed60de35e11bebb6486b").unwrap()
+        );
+    }
 
     #[test]
     fn test_address_management() {
@@ -18,33 +29,38 @@ mod utils_test {
         let addr1 = [1u8; 20];
         let addr2 = [2u8; 20];
         let addr3 = [3u8; 20];
-        assert!(!address_exists(&addresses, &addr1), "Empty vector should not contain any address");
+        assert!(
+            !address_exists(&addresses, &addr1),
+            "Empty vector should not contain any address"
+        );
 
         // Test adding first address
-        address_add(&mut addresses, addr1);
-        assert!(address_exists(&addresses, &addr1), "Address should exist after adding");
+        address_pushback(&mut addresses, addr1);
+        assert!(
+            address_exists(&addresses, &addr1),
+            "Address should exist after adding"
+        );
         assert_eq!(addresses.len(), 1, "Vector should have length 1");
 
-        // Test adding duplicate address
-        address_add(&mut addresses, addr1);
-        assert_eq!(addresses.len(), 1, "Duplicate address should not increase length");
-        assert!(address_exists(&addresses, &addr1), "Address should still exist after duplicate add");
-
         // Test adding multiple unique addresses
-        address_add(&mut addresses, addr2);
-        address_add(&mut addresses, addr3);
-        assert!(address_exists(&addresses, &addr2), "Second address should exist");
-        assert!(address_exists(&addresses, &addr3), "Third address should exist");
+        address_pushback(&mut addresses, addr2);
+        address_pushback(&mut addresses, addr3);
+        assert!(
+            address_exists(&addresses, &addr2),
+            "Second address should exist"
+        );
+        assert!(
+            address_exists(&addresses, &addr3),
+            "Third address should exist"
+        );
         assert_eq!(addresses.len(), 3, "Vector should have length 3");
 
         // Test non-existent address
         let addr4 = [4u8; 20];
-        assert!(!address_exists(&addresses, &addr4), "Non-existent address should not be found");
-
-        // Test adding more duplicates
-        address_add(&mut addresses, addr1);
-        address_add(&mut addresses, addr2);
-        assert_eq!(addresses.len(), 3, "Duplicates should not increase length");
+        assert!(
+            !address_exists(&addresses, &addr4),
+            "Non-existent address should not be found"
+        );
     }
 
     #[test]
@@ -141,11 +157,9 @@ mod utils_test {
 
         // Test duplicate signatures
         let mut signature_proof = Vec::new();
-        // First signature
         signature_proof.extend_from_slice(&[3u8; 32]); // r1
         signature_proof.extend_from_slice(&[4u8; 32]); // s1
         signature_proof.push(0); // v1
-        // Duplicate signature
         signature_proof.extend_from_slice(&[3u8; 32]); // r1 again
         signature_proof.extend_from_slice(&[4u8; 32]); // s1 again
         signature_proof.push(0); // v1 again

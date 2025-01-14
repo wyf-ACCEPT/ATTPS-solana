@@ -18,10 +18,13 @@ mod instruction_test {
     async fn test_counter_program() {
         use crate::processor::process_instruction_counter;
         let program_id = Pubkey::new_unique();
-        let (mut banks_client, payer, recent_blockhash) =
-            ProgramTest::new("attps_solana", program_id, processor!(process_instruction_counter))
-                .start()
-                .await;
+        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
+            "attps_solana",
+            program_id,
+            processor!(process_instruction_counter),
+        )
+        .start()
+        .await;
 
         // Create a new keypair to use as the address for our counter account
         let counter_keypair = Keypair::new();
