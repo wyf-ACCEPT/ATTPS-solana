@@ -252,6 +252,20 @@ mod utils_test {
         let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 1);
         assert!(result.is_ok(), "Single signature verification failed");
 
+        // Test with not-enough signatures
+        let result = verify_signature(
+            &settings_digest,
+            &message_hash,
+            &sig1,
+            &allowed_signers,
+            2,
+        );
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProgramError::Custom(3) // InvalidThreshold
+        ));
+
         // Test with both signatures (threshold = 2)
         let mut combined_sig = Vec::new();
         combined_sig.extend_from_slice(&sig1);
