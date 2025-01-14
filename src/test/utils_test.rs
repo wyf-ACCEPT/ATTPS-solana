@@ -205,4 +205,64 @@ mod utils_test {
             ProgramError::Custom(1) // UnsupportedProofMethod
         ));
     }
+
+    #[test]
+    fn test_verify_signature_success() {
+        // Message hash: "hello world!"
+        let message_hash =
+            hex::decode("57caa176af1ac0433c5df30e8dabcd2ec1af1e92a26eced5f719b88458777cd6")
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+        // Allowed signers
+        let signer1 = hex::decode("6370eF2f4Db3611D657b90667De398a2Cc2a370C").unwrap();
+        let signer2 = hex::decode("677bb7270e0b03f0A2993A697654fb8Ecb6deE91").unwrap();
+        let allowed_signers: Vec<[u8; 20]> = vec![
+            signer1[..20].try_into().unwrap(),
+            signer2[..20].try_into().unwrap(),
+        ];
+
+        // Signature 1
+        let mut sig1 = Vec::new();
+        sig1.extend_from_slice(
+            &hex::decode("26eebcfa4a0f21ed6e03722eebba46377a6d394686d83cb47be28fd1bf6b984a")
+                .unwrap(),
+        ); // r
+        sig1.extend_from_slice(
+            &hex::decode("119870fe1cc35ddfae19900ce8afcd88531bb000e8bc4c82dcd5cab0fe7db54d")
+                .unwrap(),
+        ); // s
+        sig1.push(1); // yParity (recovery_id)
+
+        // Signature 2
+        let mut sig2 = Vec::new();
+        sig2.extend_from_slice(
+            &hex::decode("116b0c5a99594bc09a5b9e2e2b694f5c19fc9be1b266f10c06572e9f73350e46")
+                .unwrap(),
+        ); // r
+        sig2.extend_from_slice(
+            &hex::decode("48c8e675d1defa0033781a41c73ec2c7edfd59aefa32ddb8bed6119b51c28b2d")
+                .unwrap(),
+        ); // s
+        sig2.push(0); // yParity (recovery_id)
+
+        // Test with single signature (threshold = 1)
+        let settings_digest = [0u8; 32];
+        let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 1);
+        assert!(result.is_ok(), "Single signature verification failed");
+
+        // Test with both signatures (threshold = 2)
+        let mut combined_sig = Vec::new();
+        combined_sig.extend_from_slice(&sig1);
+        combined_sig.extend_from_slice(&sig2);
+        let result = verify_signature(
+            &settings_digest,
+            &message_hash,
+            &combined_sig,
+            &allowed_signers,
+            2,
+        );
+        assert!(result.is_ok(), "Combined signatures verification failed");
+    }
 }

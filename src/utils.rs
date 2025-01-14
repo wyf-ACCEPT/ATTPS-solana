@@ -1,9 +1,9 @@
+use crate::error::VerificationError;
 use solana_program::{
     keccak,
     program_error::ProgramError,
     secp256k1_recover::{secp256k1_recover, Secp256k1Pubkey},
 };
-use crate::error::VerificationError;
 
 /// Check if an Ethereum-style address exists in a vector of addresses
 pub(crate) fn address_exists(addresses: &Vec<[u8; 20]>, target: &[u8; 20]) -> bool {
