@@ -3,7 +3,7 @@ mod utils_test {
 
     use crate::utils::{
         address_exists, address_pushback, pubkey_to_eth_address, verify_merkle, verify_signature,
-        verify_zk, VerificationError,
+        verify_zk,
     };
     use solana_program::{program_error::ProgramError, secp256k1_recover::Secp256k1Pubkey};
 

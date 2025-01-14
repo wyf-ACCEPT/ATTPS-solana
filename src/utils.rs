@@ -3,29 +3,7 @@ use solana_program::{
     program_error::ProgramError,
     secp256k1_recover::{secp256k1_recover, Secp256k1Pubkey},
 };
-
-#[derive(Debug)]
-pub enum VerificationError {
-    UnsupportedProofMethod,
-    InvalidSignature,
-    InvalidThreshold,
-    DuplicateSigner,
-    SignerNotAllowed,
-    InvalidSignatureProof,
-}
-
-impl From<VerificationError> for ProgramError {
-    fn from(e: VerificationError) -> Self {
-        ProgramError::Custom(match e {
-            VerificationError::UnsupportedProofMethod => 1,
-            VerificationError::InvalidSignature => 2,
-            VerificationError::InvalidThreshold => 3,
-            VerificationError::DuplicateSigner => 4,
-            VerificationError::SignerNotAllowed => 5,
-            VerificationError::InvalidSignatureProof => 6,
-        })
-    }
-}
+use crate::error::VerificationError;
 
 /// Check if an Ethereum-style address exists in a vector of addresses
 pub(crate) fn address_exists(addresses: &Vec<[u8; 20]>, target: &[u8; 20]) -> bool {
