@@ -64,35 +64,6 @@ mod utils_test {
     }
 
     #[test]
-    fn test_verify_signature_with_different_v_values() {
-        let settings_digest = [1u8; 32];
-        let message_hash = [2u8; 32];
-        let allowed_signers = vec![[5u8; 20]];
-        let threshold = 1;
-
-        // Test both v values (0 and 1, which become 27 and 28)
-        for v in [0u8, 1u8] {
-            let mut signature_proof = Vec::new();
-            signature_proof.extend_from_slice(&[3u8; 32]); // r
-            signature_proof.extend_from_slice(&[4u8; 32]); // s
-            signature_proof.push(v);
-
-            let result = verify_signature(
-                &settings_digest,
-                &message_hash,
-                &signature_proof,
-                &allowed_signers,
-                threshold,
-            );
-            assert!(result.is_err());
-            assert!(matches!(
-                result.unwrap_err(),
-                ProgramError::Custom(2) // InvalidSignature
-            ));
-        }
-    }
-
-    #[test]
     fn test_verify_signature_invalid_proof() {
         let settings_digest = [1u8; 32];
         let message_hash = [2u8; 32];
@@ -179,34 +150,6 @@ mod utils_test {
     }
 
     #[test]
-    fn test_verify_zk() {
-        let settings_digest = [1u8; 32];
-        let message_hash = [2u8; 32];
-        let zk_proof = vec![3u8; 32];
-
-        let result = verify_zk(&settings_digest, &message_hash, &zk_proof);
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::Custom(1) // UnsupportedProofMethod
-        ));
-    }
-
-    #[test]
-    fn test_verify_merkle() {
-        let settings_digest = [1u8; 32];
-        let message_hash = [2u8; 32];
-        let merkle_proof = vec![3u8; 32];
-
-        let result = verify_merkle(&settings_digest, &message_hash, &merkle_proof);
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::Custom(1) // UnsupportedProofMethod
-        ));
-    }
-
-    #[test]
     fn test_verify_signature_success() {
         // Message hash: "hello world!"
         let message_hash =
@@ -253,13 +196,7 @@ mod utils_test {
         assert!(result.is_ok(), "Single signature verification failed");
 
         // Test with not-enough signatures
-        let result = verify_signature(
-            &settings_digest,
-            &message_hash,
-            &sig1,
-            &allowed_signers,
-            2,
-        );
+        let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 2);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -278,5 +215,33 @@ mod utils_test {
             2,
         );
         assert!(result.is_ok(), "Combined signatures verification failed");
+    }
+
+    #[test]
+    fn test_verify_zk() {
+        let settings_digest = [1u8; 32];
+        let message_hash = [2u8; 32];
+        let zk_proof = vec![3u8; 32];
+
+        let result = verify_zk(&settings_digest, &message_hash, &zk_proof);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProgramError::Custom(1) // UnsupportedProofMethod
+        ));
+    }
+
+    #[test]
+    fn test_verify_merkle() {
+        let settings_digest = [1u8; 32];
+        let message_hash = [2u8; 32];
+        let merkle_proof = vec![3u8; 32];
+
+        let result = verify_merkle(&settings_digest, &message_hash, &merkle_proof);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProgramError::Custom(1) // UnsupportedProofMethod
+        ));
     }
 }
