@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "lib"]
  
 [dependencies]
+hex = "0.4.3"
 borsh = "1.5.3"
 solana-program = "1.18.26"
 
