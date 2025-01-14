@@ -1,5 +1,5 @@
-use crate::instruction::CounterInstruction;
-use crate::state::CounterAccount;
+use crate::instruction::{AgentInstruction, CounterInstruction};
+use crate::state::{AgentSettings, CounterAccount, MessagePayload};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
@@ -17,6 +17,34 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    let instruction = AgentInstruction::unpack(instruction_data)?;
+    match instruction {
+        AgentInstruction::Initialize => process_initialize(program_id, accounts)?,
+        AgentInstruction::CreateAgent => process_create_agent(program_id, accounts)?,
+        AgentInstruction::RegisterAgent { agent_settings } => {
+            process_register_agent(program_id, accounts, agent_settings)?
+        }
+        AgentInstruction::CreateAndRegisterAgent { agent_settings } => {
+            process_create_and_register_agent(program_id, accounts, agent_settings)?
+        }
+        AgentInstruction::ChangeAgentSettingProposal {
+            agent_id,
+            agent_settings,
+        } => process_change_agent_setting_proposal(program_id, accounts, agent_id, agent_settings)?,
+        AgentInstruction::Verify {
+            settings_digest,
+            payload,
+        } => process_verify(program_id, accounts, settings_digest, payload)?,
+        AgentInstruction::AcceptAgent { agent_id } => {
+            process_accept_agent(program_id, accounts, agent_id)?
+        }
+        AgentInstruction::AcceptAgentSettingProposal { agent_id } => {
+            process_accept_agent_setting_proposal(program_id, accounts, agent_id)?
+        }
+        AgentInstruction::RemoveAgent { agent_id } => {
+            process_remove_agent(program_id, accounts, agent_id)?
+        }
+    };
     Ok(())
 }
 
@@ -152,5 +180,82 @@ fn process_add_any_value(
     counter_data.serialize(&mut &mut data[..])?;
 
     msg!("Counter increased by {} to {}", amount, counter_data.count);
+    Ok(())
+}
+
+// Agent instruction processing functions
+
+fn process_initialize(_program_id: &Pubkey, _accounts: &[AccountInfo]) -> ProgramResult {
+    // TODO: Initialize contract state
+    Ok(())
+}
+
+fn process_create_agent(_program_id: &Pubkey, _accounts: &[AccountInfo]) -> ProgramResult {
+    // TODO: Create new agent
+    Ok(())
+}
+
+fn process_register_agent(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_settings: AgentSettings,
+) -> ProgramResult {
+    // TODO: Register agent with provided settings
+    Ok(())
+}
+
+fn process_create_and_register_agent(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_settings: AgentSettings,
+) -> ProgramResult {
+    // TODO: Create and register agent in one transaction
+    Ok(())
+}
+
+fn process_change_agent_setting_proposal(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_id: u128,
+    _agent_settings: AgentSettings,
+) -> ProgramResult {
+    // TODO: Process agent setting change proposal
+    Ok(())
+}
+
+fn process_verify(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _settings_digest: [u8; 32],
+    _payload: MessagePayload,
+) -> ProgramResult {
+    // TODO: Verify message payload
+    Ok(())
+}
+
+fn process_accept_agent(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_id: u128,
+) -> ProgramResult {
+    // TODO: Accept agent registration
+    Ok(())
+}
+
+fn process_accept_agent_setting_proposal(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_id: u128,
+) -> ProgramResult {
+    // TODO: Accept agent setting change proposal
+    Ok(())
+}
+
+fn process_remove_agent(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    _agent_id: u128,
+) -> ProgramResult {
+    // TODO: Remove agent
     Ok(())
 }
