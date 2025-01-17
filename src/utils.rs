@@ -1,4 +1,4 @@
-use crate::error::{AttpsAccountError, VerificationError};
+use crate::error::{AgentHeaderError, AttpsAccountError, VerificationError};
 use crate::state::{AgentHeader, AgentSettings, MessageType, Priority};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
@@ -215,55 +215,26 @@ pub fn is_valid_uuid(uuid: &str) -> bool {
     true
 }
 
-/// Validates message type is within allowed range
-pub fn is_valid_message_type(message_type: &MessageType) -> bool {
-    matches!(
-        message_type,
-        MessageType::Request | MessageType::Response | MessageType::Event
-    )
-}
-
-/// Validates priority is within allowed range
-pub fn is_valid_priority(priority: &Priority) -> bool {
-    matches!(priority, Priority::High | Priority::Medium | Priority::Low)
-}
-
 /// Validates an agent header according to protocol rules
 pub fn validate_agent_header(header: &AgentHeader) -> Result<(), ProgramError> {
-    // Check version matches "1.0"
     if header.version != "1.0" {
-        return Err(VerificationError::InvalidSignatureProof.into());
+        Err(AgentHeaderError::InvalidAgentHeaderVersion.into())
+    } else if !is_valid_uuid(&header.source_agent_id) {
+        Err(AgentHeaderError::InvalidAgentHeaderAgentId.into())
+    } else if !is_valid_uuid(&header.message_id) {
+        Err(AgentHeaderError::InvalidAgentHeaderMessageId.into())
+    } else {
+        Ok(())
     }
-
-    // Validate source agent ID
-    if !is_valid_uuid(&header.source_agent_id) {
-        return Err(VerificationError::InvalidSignatureProof.into());
-    }
-
-    // Validate message ID
-    if !is_valid_uuid(&header.message_id) {
-        return Err(VerificationError::InvalidSignatureProof.into());
-    }
-
-    // Validate message type
-    if !is_valid_message_type(&header.message_type) {
-        return Err(VerificationError::InvalidSignatureProof.into());
-    }
-
-    // Validate priority
-    if !is_valid_priority(&header.priority) {
-        return Err(VerificationError::InvalidSignatureProof.into());
-    }
-
-    Ok(())
 }
 
 /// Computes a unique digest from agent settings using keccak256
-/// The digest includes a version prefix (0x0100) in the most significant 16 bits
-pub fn setting_digest_from_settings_data(agent: [u8; 20], settings: &AgentSettings) -> [u8; 32] {
+/// The digest includes a version prefix (0x0100) in the most significant 16 bits.
+/// Note that this calculation has a little difference from Solidity's abi.encode.
+pub fn setting_digest_from_settings_data(agent: Pubkey, settings: &AgentSettings) -> [u8; 32] {
     // Encode all fields in the same order as Solidity's abi.encode
     let mut data = Vec::new();
-    data.extend_from_slice(&agent);
+    data.extend_from_slice(&agent.to_bytes());
 
     // Encode signers array
     for signer in &settings.signers {
@@ -285,27 +256,15 @@ pub fn setting_digest_from_settings_data(agent: [u8; 20], settings: &AgentSettin
     // Compute keccak256 hash
     let mut hash = keccak::hash(&data).to_bytes();
 
-    // Apply prefix mask logic
-    // 0xFFFF000000000000000000000000000000000000000000000000000000000000
-    let prefix_mask: [u8; 32] = {
-        let mut mask = [0u8; 32];
-        mask[0] = 0xFF;
-        mask[1] = 0xFF;
-        mask
-    };
-
-    // 0x0100000000000000000000000000000000000000000000000000000000000000
-    let prefix: [u8; 32] = {
-        let mut p = [0u8; 32];
-        p[0] = 0x01;
-        p[1] = 0x00;
-        p
-    };
-
-    // Apply mask: (prefix & prefix_mask) | (hash & ~prefix_mask)
-    for i in 0..32 {
-        hash[i] = (prefix[i] & prefix_mask[i]) | (hash[i] & !prefix_mask[i]);
-    }
-
+    // Apply prefix mask logic, 0x0100 represents version v1.0
+    // 0x0100xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    hash[0] = 0x01;
+    hash[1] = 0x00;
     hash
 }
+
+// is_valid_message_type: No need to check in Rust
+// is_valid_priority: No need to check in Rust
+
+// _isAgentConfigExists: TODO
+// _getAgentConfigByDigest: TODO

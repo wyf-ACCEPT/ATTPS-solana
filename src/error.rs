@@ -28,3 +28,16 @@ impl From<AttpsAccountError> for ProgramError {
         ProgramError::Custom(e as u32)
     }
 }
+
+#[derive(Debug)]
+pub enum AgentHeaderError {
+    InvalidAgentHeaderVersion = 301,
+    InvalidAgentHeaderAgentId,
+    InvalidAgentHeaderMessageId,
+}
+
+impl From<AgentHeaderError> for ProgramError {
+    fn from(e: AgentHeaderError) -> Self {
+        ProgramError::Custom(e as u32)
+    }
+}

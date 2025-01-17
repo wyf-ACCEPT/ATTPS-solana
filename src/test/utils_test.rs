@@ -2,12 +2,12 @@
 mod utils_test {
 
     use crate::{
-        error::VerificationError,
+        error::{AgentHeaderError, VerificationError},
         state::{AgentHeader, AgentSettings, MessageType, Priority},
         utils::{
-            address_exists, address_pushback, is_valid_message_type, is_valid_priority,
-            is_valid_uuid, pubkey_to_eth_address, setting_digest_from_settings_data,
-            validate_agent_header, verify_merkle, verify_signature, verify_zk,
+            address_exists, address_pushback, is_valid_uuid, pubkey_to_eth_address,
+            setting_digest_from_settings_data, validate_agent_header, verify_merkle,
+            verify_signature, verify_zk,
         },
     };
     use solana_program::{pubkey::Pubkey, secp256k1_recover::Secp256k1Pubkey};
@@ -265,19 +265,6 @@ mod utils_test {
     }
 
     #[test]
-    fn test_message_type_and_priority() {
-        // Test MessageType validation
-        assert!(is_valid_message_type(&MessageType::Request));
-        assert!(is_valid_message_type(&MessageType::Response));
-        assert!(is_valid_message_type(&MessageType::Event));
-
-        // Test Priority validation
-        assert!(is_valid_priority(&Priority::High));
-        assert!(is_valid_priority(&Priority::Medium));
-        assert!(is_valid_priority(&Priority::Low));
-    }
-
-    #[test]
     fn test_validate_agent_header() {
         let valid_header = AgentHeader {
             version: "1.0".to_string(),
@@ -299,7 +286,7 @@ mod utils_test {
         invalid_header.version = "2.0".to_string();
         assert_eq!(
             validate_agent_header(&invalid_header).unwrap_err(),
-            VerificationError::InvalidSignatureProof.into()
+            AgentHeaderError::InvalidAgentHeaderVersion.into()
         );
 
         // Test invalid message_id
@@ -307,7 +294,7 @@ mod utils_test {
         invalid_header.message_id = "invalid-uuid".to_string();
         assert_eq!(
             validate_agent_header(&invalid_header).unwrap_err(),
-            VerificationError::InvalidSignatureProof.into()
+            AgentHeaderError::InvalidAgentHeaderMessageId.into()
         );
 
         // Test invalid source_agent_id
@@ -315,17 +302,17 @@ mod utils_test {
         invalid_header.source_agent_id = "invalid-uuid".to_string();
         assert_eq!(
             validate_agent_header(&invalid_header).unwrap_err(),
-            VerificationError::InvalidSignatureProof.into()
+            AgentHeaderError::InvalidAgentHeaderAgentId.into()
         );
     }
 
     #[test]
     fn test_setting_digest_from_settings_data() {
-        let agent = [1u8; 20];
+        let agent = Pubkey::from([1u8; 32]);
         let settings = AgentSettings {
             signers: vec![[2u8; 20], [3u8; 20]],
             threshold: 2,
-            converter_address: Pubkey::new_unique(),
+            converter_address: Pubkey::from([4u8; 32]),
             agent_header: AgentHeader {
                 version: "1.0".to_string(),
                 message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
@@ -341,11 +328,29 @@ mod utils_test {
 
         let digest = setting_digest_from_settings_data(agent, &settings);
 
-        // Verify prefix bytes (0x0100)
-        assert_eq!(digest[0], 0x01);
-        assert_eq!(digest[1], 0x00);
+        // Original concat string:
+        //  0101010101010101010101010101010101010101010101010101010101010101            // agent address
+        //  0202020202020202020202020202020202020202                                    // signers[0]
+        //  0303030303030303030303030303030303030303                                    // signers[1]
+        //  02                                                                          // threshold
+        //  0404040404040404040404040404040404040404040404040404040404040404            // converter_address
+        //  312e30                                                                      // version
+        //  31323365343536372d653839622d346433632d613435362d343236363134313734303030    // message_id
+        //  39383766636465622d353161322d346263332d393837362d353433323130393837363534    // source_agent_id
+        //  54657374204167656e74                                                        // source_agent_name
+        //  35353565343536372d653839622d346433632d613435362d343236363134313734303030    // target_agent_id
+        //  00000000499602d2                                                            // timestamp 0x499602d2 = 1234567890
+        //  0000                                                                        // message_type & priority
+        //  0000000000000e10                                                            // ttl 0x0e10 = 3600
 
-        // Verify remaining bytes are not all zero (hash was computed)
-        assert!(digest[2..].iter().any(|&x| x != 0));
+        let mut expected_digest: [u8; 32] =
+            hex::decode("d5c9fb2117d2488a1b7915d0d5fcbb272ec303de31f3ba8c2718d8008899feaa")
+                .unwrap()
+                .try_into()
+                .unwrap();
+            
+        expected_digest[0] = 0x01;
+        expected_digest[1] = 0x00;
+        assert_eq!(digest, expected_digest);
     }
 }
