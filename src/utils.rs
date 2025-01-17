@@ -1,4 +1,5 @@
 use crate::error::{AttpsAccountError, VerificationError};
+use crate::state::{AgentHeader, AgentSettings, MessageType, Priority};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::AccountInfo,
@@ -154,10 +155,7 @@ pub(crate) fn create_related_account<'a>(
                 data_length as u64,
                 program_id,
             ),
-            &[
-                payer_account.clone(),
-                map_account.clone(),
-            ],
+            &[payer_account.clone(), map_account.clone()],
             &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
         )
     }
@@ -178,4 +176,136 @@ pub(crate) fn read_account_data<Data: BorshDeserialize>(
 ) -> Result<Data, ProgramError> {
     let account_data = &data_account.data.borrow()[..];
     Data::try_from_slice(account_data).map_err(|_| ProgramError::InvalidAccountData)
+}
+
+/// Validates a UUID string according to v4 format
+pub fn is_valid_uuid(uuid: &str) -> bool {
+    if uuid.len() != 36 {
+        return false;
+    }
+
+    let bytes = uuid.as_bytes();
+
+    // Check hyphens at positions 8, 13, 18, 23
+    if bytes[8] != b'-' || bytes[13] != b'-' || bytes[18] != b'-' || bytes[23] != b'-' {
+        return false;
+    }
+
+    // Check version number (position 14 must be '4')
+    if bytes[14] != b'4' {
+        return false;
+    }
+
+    // Check variant (position 19 must be '8', '9', 'a', 'b', 'A', 'B')
+    match bytes[19] {
+        b'8' | b'9' | b'a' | b'b' | b'A' | b'B' => (),
+        _ => return false,
+    }
+
+    // Verify all other characters are hexadecimal
+    for (i, &byte) in bytes.iter().enumerate() {
+        if i != 8 && i != 13 && i != 18 && i != 23 {
+            match byte {
+                b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F' => continue,
+                _ => return false,
+            }
+        }
+    }
+
+    true
+}
+
+/// Validates message type is within allowed range
+pub fn is_valid_message_type(message_type: &MessageType) -> bool {
+    matches!(
+        message_type,
+        MessageType::Request | MessageType::Response | MessageType::Event
+    )
+}
+
+/// Validates priority is within allowed range
+pub fn is_valid_priority(priority: &Priority) -> bool {
+    matches!(priority, Priority::High | Priority::Medium | Priority::Low)
+}
+
+/// Validates an agent header according to protocol rules
+pub fn validate_agent_header(header: &AgentHeader) -> Result<(), ProgramError> {
+    // Check version matches "1.0"
+    if header.version != "1.0" {
+        return Err(VerificationError::InvalidSignatureProof.into());
+    }
+
+    // Validate source agent ID
+    if !is_valid_uuid(&header.source_agent_id) {
+        return Err(VerificationError::InvalidSignatureProof.into());
+    }
+
+    // Validate message ID
+    if !is_valid_uuid(&header.message_id) {
+        return Err(VerificationError::InvalidSignatureProof.into());
+    }
+
+    // Validate message type
+    if !is_valid_message_type(&header.message_type) {
+        return Err(VerificationError::InvalidSignatureProof.into());
+    }
+
+    // Validate priority
+    if !is_valid_priority(&header.priority) {
+        return Err(VerificationError::InvalidSignatureProof.into());
+    }
+
+    Ok(())
+}
+
+/// Computes a unique digest from agent settings using keccak256
+/// The digest includes a version prefix (0x0100) in the most significant 16 bits
+pub fn setting_digest_from_settings_data(agent: [u8; 20], settings: &AgentSettings) -> [u8; 32] {
+    // Encode all fields in the same order as Solidity's abi.encode
+    let mut data = Vec::new();
+    data.extend_from_slice(&agent);
+
+    // Encode signers array
+    for signer in &settings.signers {
+        data.extend_from_slice(signer);
+    }
+
+    data.push(settings.threshold);
+    data.extend_from_slice(&settings.converter_address.to_bytes());
+    data.extend_from_slice(settings.agent_header.version.as_bytes());
+    data.extend_from_slice(settings.agent_header.message_id.as_bytes());
+    data.extend_from_slice(settings.agent_header.source_agent_id.as_bytes());
+    data.extend_from_slice(settings.agent_header.source_agent_name.as_bytes());
+    data.extend_from_slice(settings.agent_header.target_agent_id.as_bytes());
+    data.extend_from_slice(&settings.agent_header.timestamp.to_be_bytes());
+    data.extend_from_slice(&[settings.agent_header.message_type.clone() as u8]);
+    data.extend_from_slice(&[settings.agent_header.priority.clone() as u8]);
+    data.extend_from_slice(&settings.agent_header.ttl.to_be_bytes());
+
+    // Compute keccak256 hash
+    let mut hash = keccak::hash(&data).to_bytes();
+
+    // Apply prefix mask logic
+    // 0xFFFF000000000000000000000000000000000000000000000000000000000000
+    let prefix_mask: [u8; 32] = {
+        let mut mask = [0u8; 32];
+        mask[0] = 0xFF;
+        mask[1] = 0xFF;
+        mask
+    };
+
+    // 0x0100000000000000000000000000000000000000000000000000000000000000
+    let prefix: [u8; 32] = {
+        let mut p = [0u8; 32];
+        p[0] = 0x01;
+        p[1] = 0x00;
+        p
+    };
+
+    // Apply mask: (prefix & prefix_mask) | (hash & ~prefix_mask)
+    for i in 0..32 {
+        hash[i] = (prefix[i] & prefix_mask[i]) | (hash[i] & !prefix_mask[i]);
+    }
+
+    hash
 }
