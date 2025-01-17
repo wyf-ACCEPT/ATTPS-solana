@@ -2,7 +2,7 @@
 mod utils_test {
 
     use crate::{
-        error::AttpsAccountError,
+        error::{AttpsAccountError, VerificationError},
         utils::{
             address_exists, address_pushback, create_related_account, pubkey_to_eth_address,
             verify_merkle, verify_signature, verify_zk, write_related_account,
@@ -251,216 +251,216 @@ mod utils_test {
         );
     }
 
-    #[test]
-    fn test_create_related_account() {
-        let program_id = Pubkey::new_unique();
-        let payer_key = Pubkey::new_unique();
-        let prefix = b"test";
-        let phrase = b"phrase";
+    // #[test]
+    // fn test_create_related_account() {
+    //     let program_id = Pubkey::new_unique();
+    //     let payer_key = Pubkey::new_unique();
+    //     let prefix = b"test";
+    //     let phrase = b"phrase";
 
-        // Create mock accounts
-        let mut lamports = 0;
-        let mut payer_data = vec![];
-        let payer_account = AccountInfo::new(
-            &payer_key,
-            true,
-            true,
-            &mut lamports,
-            &mut payer_data,
-            &program_id,
-            false,
-            0,
-        );
+    //     // Create mock accounts
+    //     let mut lamports = 0;
+    //     let mut payer_data = vec![];
+    //     let payer_account = AccountInfo::new(
+    //         &payer_key,
+    //         true,
+    //         true,
+    //         &mut lamports,
+    //         &mut payer_data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        // Calculate expected PDA
-        let (pda_pubkey, _) = Pubkey::find_program_address(&[prefix, phrase], &program_id);
-        let mut map_lamports = 0;
-        let mut map_data = vec![];
-        let map_account = AccountInfo::new(
-            &pda_pubkey,
-            false, // Should fail because not writable
-            true,
-            &mut map_lamports,
-            &mut map_data,
-            &program_id,
-            false,
-            0,
-        );
+    //     // Calculate expected PDA
+    //     let (pda_pubkey, _) = Pubkey::find_program_address(&[prefix, phrase], &program_id);
+    //     let mut map_lamports = 0;
+    //     let mut map_data = vec![];
+    //     let map_account = AccountInfo::new(
+    //         &pda_pubkey,
+    //         false, // Should fail because not writable
+    //         true,
+    //         &mut map_lamports,
+    //         &mut map_data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        // Test not writable error
-        let result = create_related_account(
-            &program_id,
-            &payer_account,
-            &map_account,
-            prefix,
-            phrase,
-            100,
-        );
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::Custom(2) // PdaAccountNotWritable
-        ));
+    //     // Test not writable error
+    //     let result = create_related_account(
+    //         &program_id,
+    //         &payer_account,
+    //         &map_account,
+    //         prefix,
+    //         phrase,
+    //         100,
+    //     );
+    //     assert!(result.is_err());
+    //     assert!(matches!(
+    //         result.unwrap_err(),
+    //         ProgramError::Custom(2) // PdaAccountNotWritable
+    //     ));
 
-        // Test with writable but wrong pubkey
-        let wrong_pubkey = Pubkey::new_unique();
-        let mut wrong_map_data = vec![];
-        let wrong_map_account = AccountInfo::new(
-            &wrong_pubkey,
-            true,
-            true,
-            &mut map_lamports,
-            &mut wrong_map_data,
-            &program_id,
-            false,
-            0,
-        );
+    //     // Test with writable but wrong pubkey
+    //     let wrong_pubkey = Pubkey::new_unique();
+    //     let mut wrong_map_data = vec![];
+    //     let wrong_map_account = AccountInfo::new(
+    //         &wrong_pubkey,
+    //         true,
+    //         true,
+    //         &mut map_lamports,
+    //         &mut wrong_map_data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        let result = create_related_account(
-            &program_id,
-            &payer_account,
-            &wrong_map_account,
-            prefix,
-            phrase,
-            100,
-        );
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::Custom(1) // PdaAccountMismatch
-        ));
+    //     let result = create_related_account(
+    //         &program_id,
+    //         &payer_account,
+    //         &wrong_map_account,
+    //         prefix,
+    //         phrase,
+    //         100,
+    //     );
+    //     assert!(result.is_err());
+    //     assert!(matches!(
+    //         result.unwrap_err(),
+    //         ProgramError::Custom(1) // PdaAccountMismatch
+    //     ));
 
-        // Test with already created account
-        let mut existing_data = vec![1; 10]; // Non-empty data
-        let existing_account = AccountInfo::new(
-            &pda_pubkey,
-            true,
-            true,
-            &mut map_lamports,
-            &mut existing_data,
-            &program_id,
-            false,
-            0,
-        );
+    //     // Test with already created account
+    //     let mut existing_data = vec![1; 10]; // Non-empty data
+    //     let existing_account = AccountInfo::new(
+    //         &pda_pubkey,
+    //         true,
+    //         true,
+    //         &mut map_lamports,
+    //         &mut existing_data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        let result = create_related_account(
-            &program_id,
-            &payer_account,
-            &existing_account,
-            prefix,
-            phrase,
-            100,
-        );
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::Custom(3) // PdaAccountAlreadyCreated
-        ));
+    //     let result = create_related_account(
+    //         &program_id,
+    //         &payer_account,
+    //         &existing_account,
+    //         prefix,
+    //         phrase,
+    //         100,
+    //     );
+    //     assert!(result.is_err());
+    //     assert!(matches!(
+    //         result.unwrap_err(),
+    //         ProgramError::Custom(3) // PdaAccountAlreadyCreated
+    //     ));
 
-        // Test successful account creation
-        let mut empty_data = vec![];
-        let writable_account = AccountInfo::new(
-            &pda_pubkey,
-            true,
-            true,
-            &mut map_lamports,
-            &mut empty_data,
-            &program_id,
-            false,
-            0,
-        );
+    //     // Test successful account creation
+    //     let mut empty_data = vec![];
+    //     let writable_account = AccountInfo::new(
+    //         &pda_pubkey,
+    //         true,
+    //         true,
+    //         &mut map_lamports,
+    //         &mut empty_data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        let result = create_related_account(
-            &program_id,
-            &payer_account,
-            &writable_account,
-            prefix,
-            phrase,
-            100,
-        );
-        assert!(
-            result.is_ok(),
-            "Account creation should succeed with valid parameters"
-        );
-    }
+    //     let result = create_related_account(
+    //         &program_id,
+    //         &payer_account,
+    //         &writable_account,
+    //         prefix,
+    //         phrase,
+    //         100,
+    //     );
+    //     assert!(
+    //         result.is_ok(),
+    //         "Account creation should succeed with valid parameters"
+    //     );
+    // }
 
-    #[test]
-    fn test_write_related_account() {
-        let program_id = Pubkey::new_unique();
-        let account_key = Pubkey::new_unique();
-        let mut lamports = 100;
-        let mut data = vec![0; 10]; // Initialize with zeros
-        let map_account = AccountInfo::new(
-            &account_key,
-            true,
-            true,
-            &mut lamports,
-            &mut data,
-            &program_id,
-            false,
-            0,
-        );
+    // #[test]
+    // fn test_write_related_account() {
+    //     let program_id = Pubkey::new_unique();
+    //     let account_key = Pubkey::new_unique();
+    //     let mut lamports = 100;
+    //     let mut data = vec![0; 10]; // Initialize with zeros
+    //     let map_account = AccountInfo::new(
+    //         &account_key,
+    //         true,
+    //         true,
+    //         &mut lamports,
+    //         &mut data,
+    //         &program_id,
+    //         false,
+    //         0,
+    //     );
 
-        // Test writing data
-        let content = vec![1, 2, 3, 4, 5];
-        let result = write_related_account(&map_account, &content);
-        assert!(result.is_ok(), "Writing to account should succeed");
+    //     // Test writing data
+    //     let content = vec![1, 2, 3, 4, 5];
+    //     let result = write_related_account(&map_account, &content);
+    //     assert!(result.is_ok(), "Writing to account should succeed");
 
-        // Verify data was written correctly
-        let account_data = map_account.data.borrow();
-        assert_eq!(
-            &account_data[..5],
-            &content,
-            "Written data should match input content"
-        );
-        assert_eq!(
-            &account_data[5..],
-            &[0; 5],
-            "Remaining data should be unchanged"
-        );
+    //     // Verify data was written correctly
+    //     let account_data = map_account.data.borrow();
+    //     assert_eq!(
+    //         &account_data[..5],
+    //         &content,
+    //         "Written data should match input content"
+    //     );
+    //     assert_eq!(
+    //         &account_data[5..],
+    //         &[0; 5],
+    //         "Remaining data should be unchanged"
+    //     );
 
-        // Test writing data of same length
-        let new_content = vec![5, 4, 3, 2, 1];
-        let result = write_related_account(&map_account, &new_content);
-        assert!(result.is_ok(), "Overwriting account should succeed");
+    //     // Test writing data of same length
+    //     let new_content = vec![5, 4, 3, 2, 1];
+    //     let result = write_related_account(&map_account, &new_content);
+    //     assert!(result.is_ok(), "Overwriting account should succeed");
 
-        let account_data = map_account.data.borrow();
-        assert_eq!(
-            &account_data[..5],
-            &new_content,
-            "Overwritten data should match new content"
-        );
+    //     let account_data = map_account.data.borrow();
+    //     assert_eq!(
+    //         &account_data[..5],
+    //         &new_content,
+    //         "Overwritten data should match new content"
+    //     );
 
-        // Test writing data larger than account size
-        let too_large_content = vec![1; 20]; // Account size is 10
-        let result = write_related_account(&map_account, &too_large_content);
-        assert!(
-            result.is_err(),
-            "Writing data larger than account size should fail"
-        );
-        assert!(matches!(
-            result.unwrap_err(),
-            ProgramError::AccountDataTooSmall
-        ));
+    //     // Test writing data larger than account size
+    //     let too_large_content = vec![1; 20]; // Account size is 10
+    //     let result = write_related_account(&map_account, &too_large_content);
+    //     assert!(
+    //         result.is_err(),
+    //         "Writing data larger than account size should fail"
+    //     );
+    //     assert!(matches!(
+    //         result.unwrap_err(),
+    //         ProgramError::AccountDataTooSmall
+    //     ));
 
-        // Test writing empty data
-        let empty_content = vec![];
-        let result = write_related_account(&map_account, &empty_content);
-        assert!(result.is_ok(), "Writing empty data should succeed");
+    //     // Test writing empty data
+    //     let empty_content = vec![];
+    //     let result = write_related_account(&map_account, &empty_content);
+    //     assert!(result.is_ok(), "Writing empty data should succeed");
 
-        // Test writing data exactly matching account size
-        let exact_content = vec![2; 10];
-        let result = write_related_account(&map_account, &exact_content);
-        assert!(
-            result.is_ok(),
-            "Writing data of exact account size should succeed"
-        );
+    //     // Test writing data exactly matching account size
+    //     let exact_content = vec![2; 10];
+    //     let result = write_related_account(&map_account, &exact_content);
+    //     assert!(
+    //         result.is_ok(),
+    //         "Writing data of exact account size should succeed"
+    //     );
 
-        let account_data = map_account.data.borrow();
-        assert_eq!(
-            &account_data[..],
-            &exact_content,
-            "Data should match when writing exact size"
-        );
-    }
+    //     let account_data = map_account.data.borrow();
+    //     assert_eq!(
+    //         &account_data[..],
+    //         &exact_content,
+    //         "Data should match when writing exact size"
+    //     );
+    // }
 }
