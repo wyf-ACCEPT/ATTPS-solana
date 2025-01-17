@@ -15,12 +15,12 @@ mod instruction_test {
     /// This test is for reference. Will be removed in the future.
     #[tokio::test]
     async fn test_counter_program() {
-        use crate::processor::process_instruction_counter;
+        use crate::processor::CounterProcessor;
         let program_id = Pubkey::new_unique();
         let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
             "attps_solana",
             program_id,
-            processor!(process_instruction_counter),
+            processor!(CounterProcessor::process_instruction_counter),
         )
         .start()
         .await;

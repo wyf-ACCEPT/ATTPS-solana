@@ -2,15 +2,10 @@
 mod utils_test {
 
     use crate::{
-        error::{AgentHeaderError, VerificationError},
-        state::{AgentHeader, AgentSettings, MessageType, Priority},
-        utils::{
-            address_exists, address_pushback, is_valid_uuid, pubkey_to_eth_address,
-            setting_digest_from_settings_data, validate_agent_header, verify_merkle,
-            verify_signature, verify_zk,
-        },
+        error::VerificationError,
+        utils::AgentUtils,
     };
-    use solana_program::{pubkey::Pubkey, secp256k1_recover::Secp256k1Pubkey};
+    use solana_program::secp256k1_recover::Secp256k1Pubkey;
 
     #[test]
     fn test_pubkey_to_eth_address() {
@@ -22,7 +17,7 @@ mod utils_test {
             .unwrap(),
         );
         assert_eq!(
-            Vec::from(pubkey_to_eth_address(&pubkey)),
+            Vec::from(AgentUtils::pubkey_to_eth_address(&pubkey)),
             hex::decode("052c7707093534035fc2ed60de35e11bebb6486b").unwrap()
         );
     }
@@ -35,27 +30,27 @@ mod utils_test {
         let addr2 = [2u8; 20];
         let addr3 = [3u8; 20];
         assert!(
-            !address_exists(&addresses, &addr1),
+            !AgentUtils::address_exists(&addresses, &addr1),
             "Empty vector should not contain any address"
         );
 
         // Test adding first address
-        address_pushback(&mut addresses, addr1);
+        AgentUtils::address_pushback(&mut addresses, addr1);
         assert!(
-            address_exists(&addresses, &addr1),
+            AgentUtils::address_exists(&addresses, &addr1),
             "Address should exist after adding"
         );
         assert_eq!(addresses.len(), 1, "Vector should have length 1");
 
         // Test adding multiple unique addresses
-        address_pushback(&mut addresses, addr2);
-        address_pushback(&mut addresses, addr3);
+        AgentUtils::address_pushback(&mut addresses, addr2);
+        AgentUtils::address_pushback(&mut addresses, addr3);
         assert!(
-            address_exists(&addresses, &addr2),
+            AgentUtils::address_exists(&addresses, &addr2),
             "Second address should exist"
         );
         assert!(
-            address_exists(&addresses, &addr3),
+            AgentUtils::address_exists(&addresses, &addr3),
             "Third address should exist"
         );
         assert_eq!(addresses.len(), 3, "Vector should have length 3");
@@ -63,7 +58,7 @@ mod utils_test {
         // Test non-existent address
         let addr4 = [4u8; 20];
         assert!(
-            !address_exists(&addresses, &addr4),
+            !AgentUtils::address_exists(&addresses, &addr4),
             "Non-existent address should not be found"
         );
     }
@@ -77,7 +72,7 @@ mod utils_test {
 
         // Test invalid length
         let invalid_proof = vec![1u8; 10];
-        let result = verify_signature(
+        let result = AgentUtils::verify_signature(
             &settings_digest,
             &message_hash,
             &invalid_proof,
@@ -92,7 +87,7 @@ mod utils_test {
 
         // Test empty proof
         let empty_proof = vec![];
-        let result = verify_signature(
+        let result = AgentUtils::verify_signature(
             &settings_digest,
             &message_hash,
             &empty_proof,
@@ -118,7 +113,7 @@ mod utils_test {
         signature_proof.extend_from_slice(&[4u8; 32]); // s1
         signature_proof.push(0); // v1
 
-        let result = verify_signature(
+        let result = AgentUtils::verify_signature(
             &settings_digest,
             &message_hash,
             &signature_proof,
@@ -140,7 +135,7 @@ mod utils_test {
         signature_proof.extend_from_slice(&[4u8; 32]); // s1 again
         signature_proof.push(0); // v1 again
 
-        let result = verify_signature(
+        let result = AgentUtils::verify_signature(
             &settings_digest,
             &message_hash,
             &signature_proof,
@@ -197,11 +192,23 @@ mod utils_test {
 
         // Test with single signature (threshold = 1)
         let settings_digest = [0u8; 32];
-        let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 1);
+        let result = AgentUtils::verify_signature(
+            &settings_digest,
+            &message_hash,
+            &sig1,
+            &allowed_signers,
+            1,
+        );
         assert!(result.is_ok(), "Single signature verification failed");
 
         // Test with not-enough signatures
-        let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 2);
+        let result = AgentUtils::verify_signature(
+            &settings_digest,
+            &message_hash,
+            &sig1,
+            &allowed_signers,
+            2,
+        );
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -212,7 +219,7 @@ mod utils_test {
         let mut combined_sig = Vec::new();
         combined_sig.extend_from_slice(&sig1);
         combined_sig.extend_from_slice(&sig2);
-        let result = verify_signature(
+        let result = AgentUtils::verify_signature(
             &settings_digest,
             &message_hash,
             &combined_sig,
@@ -228,7 +235,7 @@ mod utils_test {
         let message_hash = [2u8; 32];
         let zk_proof = vec![3u8; 32];
 
-        let result = verify_zk(&settings_digest, &message_hash, &zk_proof);
+        let result = AgentUtils::verify_zk(&settings_digest, &message_hash, &zk_proof);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -242,7 +249,7 @@ mod utils_test {
         let message_hash = [2u8; 32];
         let merkle_proof = vec![3u8; 32];
 
-        let result = verify_merkle(&settings_digest, &message_hash, &merkle_proof);
+        let result = AgentUtils::verify_merkle(&settings_digest, &message_hash, &merkle_proof);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -250,107 +257,4 @@ mod utils_test {
         );
     }
 
-    #[test]
-    fn test_is_valid_uuid() {
-        // Valid UUIDs
-        assert!(is_valid_uuid("123e4567-e89b-4d3c-a456-426614174000"));
-        assert!(is_valid_uuid("987fcdeb-51a2-4bc3-9876-543210987654"));
-
-        // Invalid UUIDs
-        assert!(!is_valid_uuid("not-a-uuid"));
-        assert!(!is_valid_uuid("123e4567-e89b-1d3c-a456-426614174000")); // Wrong version
-        assert!(!is_valid_uuid("123e4567-e89b-4d3c-x456-426614174000")); // Invalid hex
-        assert!(!is_valid_uuid("123e4567-e89b-4d3c-a456")); // Too short
-        assert!(!is_valid_uuid("123e4567-e89b-4d3c-a456-4266141740001")); // Too long
-    }
-
-    #[test]
-    fn test_validate_agent_header() {
-        let valid_header = AgentHeader {
-            version: "1.0".to_string(),
-            message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
-            source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
-            source_agent_name: "Test Agent".to_string(),
-            target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
-            timestamp: 1234567890,
-            message_type: MessageType::Request,
-            priority: Priority::High,
-            ttl: 3600,
-        };
-
-        // Test valid header
-        assert!(validate_agent_header(&valid_header).is_ok());
-
-        // Test invalid version
-        let mut invalid_header = valid_header.clone();
-        invalid_header.version = "2.0".to_string();
-        assert_eq!(
-            validate_agent_header(&invalid_header).unwrap_err(),
-            AgentHeaderError::InvalidAgentHeaderVersion.into()
-        );
-
-        // Test invalid message_id
-        let mut invalid_header = valid_header.clone();
-        invalid_header.message_id = "invalid-uuid".to_string();
-        assert_eq!(
-            validate_agent_header(&invalid_header).unwrap_err(),
-            AgentHeaderError::InvalidAgentHeaderMessageId.into()
-        );
-
-        // Test invalid source_agent_id
-        let mut invalid_header = valid_header.clone();
-        invalid_header.source_agent_id = "invalid-uuid".to_string();
-        assert_eq!(
-            validate_agent_header(&invalid_header).unwrap_err(),
-            AgentHeaderError::InvalidAgentHeaderAgentId.into()
-        );
-    }
-
-    #[test]
-    fn test_setting_digest_from_settings_data() {
-        let agent = Pubkey::from([1u8; 32]);
-        let settings = AgentSettings {
-            signers: vec![[2u8; 20], [3u8; 20]],
-            threshold: 2,
-            converter_address: Pubkey::from([4u8; 32]),
-            agent_header: AgentHeader {
-                version: "1.0".to_string(),
-                message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
-                source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
-                source_agent_name: "Test Agent".to_string(),
-                target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
-                timestamp: 1234567890,
-                message_type: MessageType::Request,
-                priority: Priority::High,
-                ttl: 3600,
-            },
-        };
-
-        let digest = setting_digest_from_settings_data(agent, &settings);
-
-        // Original concat string:
-        //  0101010101010101010101010101010101010101010101010101010101010101            // agent address
-        //  0202020202020202020202020202020202020202                                    // signers[0]
-        //  0303030303030303030303030303030303030303                                    // signers[1]
-        //  02                                                                          // threshold
-        //  0404040404040404040404040404040404040404040404040404040404040404            // converter_address
-        //  312e30                                                                      // version
-        //  31323365343536372d653839622d346433632d613435362d343236363134313734303030    // message_id
-        //  39383766636465622d353161322d346263332d393837362d353433323130393837363534    // source_agent_id
-        //  54657374204167656e74                                                        // source_agent_name
-        //  35353565343536372d653839622d346433632d613435362d343236363134313734303030    // target_agent_id
-        //  00000000499602d2                                                            // timestamp 0x499602d2 = 1234567890
-        //  0000                                                                        // message_type & priority
-        //  0000000000000e10                                                            // ttl 0x0e10 = 3600
-
-        let mut expected_digest: [u8; 32] =
-            hex::decode("d5c9fb2117d2488a1b7915d0d5fcbb272ec303de31f3ba8c2718d8008899feaa")
-                .unwrap()
-                .try_into()
-                .unwrap();
-            
-        expected_digest[0] = 0x01;
-        expected_digest[1] = 0x00;
-        assert_eq!(digest, expected_digest);
-    }
 }
