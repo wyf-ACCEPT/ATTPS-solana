@@ -4,7 +4,7 @@ use solana_program::pubkey::Pubkey;
 use solana_program_test::*;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
-    signature::{Keypair, Signer},
+    signature::Signer,
     system_program,
     transaction::Transaction,
 };

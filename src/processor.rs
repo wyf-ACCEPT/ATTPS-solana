@@ -6,11 +6,8 @@ use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     msg,
-    program::invoke,
     program_error::ProgramError,
     pubkey::Pubkey,
-    system_instruction,
-    sysvar::{rent::Rent, Sysvar},
 };
 
 pub fn process_instruction(
@@ -162,8 +159,6 @@ fn process_add_any_value(
     msg!("Counter increased by {} to {}", amount, counter_data.count);
     Ok(())
 }
-
-// Agent instruction processing functions
 
 fn process_initialize(_program_id: &Pubkey, _accounts: &[AccountInfo]) -> ProgramResult {
     // TODO: Initialize contract state
