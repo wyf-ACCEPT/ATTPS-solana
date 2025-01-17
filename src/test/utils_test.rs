@@ -1,9 +1,12 @@
 #[cfg(test)]
 mod utils_test {
 
-    use crate::utils::{
-        address_exists, address_pushback, pubkey_to_eth_address, verify_merkle, verify_signature,
-        verify_zk,
+    use crate::{
+        error::VerificationError,
+        utils::{
+            address_exists, address_pushback, pubkey_to_eth_address, verify_merkle,
+            verify_signature, verify_zk,
+        },
     };
     use solana_program::{program_error::ProgramError, secp256k1_recover::Secp256k1Pubkey};
 
@@ -80,10 +83,10 @@ mod utils_test {
             threshold,
         );
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(6) // InvalidSignatureProof
-        ));
+            VerificationError::InvalidSignatureProof.into()
+        );
 
         // Test empty proof
         let empty_proof = vec![];
@@ -95,10 +98,10 @@ mod utils_test {
             threshold,
         );
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(6) // InvalidSignatureProof
-        ));
+            VerificationError::InvalidSignatureProof.into()
+        );
     }
 
     #[test]
@@ -121,10 +124,10 @@ mod utils_test {
             2, // Requires 2 signatures but only 1 provided
         );
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(3) // InvalidThreshold
-        ));
+            VerificationError::InvalidThreshold.into()
+        );
 
         // Test duplicate signatures
         let mut signature_proof = Vec::new();
@@ -143,10 +146,10 @@ mod utils_test {
             2,
         );
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(4) // DuplicateSigner
-        ));
+            VerificationError::DuplicateSigner.into()
+        );
     }
 
     #[test]
@@ -198,10 +201,10 @@ mod utils_test {
         // Test with not-enough signatures
         let result = verify_signature(&settings_digest, &message_hash, &sig1, &allowed_signers, 2);
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(3) // InvalidThreshold
-        ));
+            VerificationError::InvalidThreshold.into()
+        );
 
         // Test with both signatures (threshold = 2)
         let mut combined_sig = Vec::new();
@@ -225,10 +228,10 @@ mod utils_test {
 
         let result = verify_zk(&settings_digest, &message_hash, &zk_proof);
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(1) // UnsupportedProofMethod
-        ));
+            VerificationError::UnsupportedProofMethod.into()
+        );
     }
 
     #[test]
@@ -239,9 +242,9 @@ mod utils_test {
 
         let result = verify_merkle(&settings_digest, &message_hash, &merkle_proof);
         assert!(result.is_err());
-        assert!(matches!(
+        assert_eq!(
             result.unwrap_err(),
-            ProgramError::Custom(1) // UnsupportedProofMethod
-        ));
+            VerificationError::UnsupportedProofMethod.into()
+        );
     }
 }
