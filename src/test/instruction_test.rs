@@ -27,7 +27,8 @@ mod instruction_test {
         .await;
 
         // Create a new keypair to use as the address for our counter account
-        let counter_keypair = Keypair::new();
+        // let counter_keypair = Keypair::new();
+        let (counter_pubkey, _) = Pubkey::find_program_address(&[b"counter", b"-1"], &program_id);
         let initial_value: u64 = 42;
 
         // Step 1: Initialize the counter
@@ -41,7 +42,7 @@ mod instruction_test {
             program_id,
             &init_instruction_data,
             vec![
-                AccountMeta::new(counter_keypair.pubkey(), true),
+                AccountMeta::new(counter_pubkey, true),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
@@ -50,12 +51,12 @@ mod instruction_test {
         // Send transaction with initialize instruction
         let mut transaction =
             Transaction::new_with_payer(&[initialize_instruction], Some(&payer.pubkey()));
-        transaction.sign(&[&payer, &counter_keypair], recent_blockhash);
+        transaction.sign(&[&payer], recent_blockhash);
         banks_client.process_transaction(transaction).await.unwrap();
 
         // Check account data
         let account = banks_client
-            .get_account(counter_keypair.pubkey())
+            .get_account(counter_pubkey)
             .await
             .expect("Failed to get counter account");
 
@@ -76,20 +77,22 @@ mod instruction_test {
         let increment_instruction = Instruction::new_with_bytes(
             program_id,
             &[1], // 1 = increment instruction
-            vec![AccountMeta::new(counter_keypair.pubkey(), true)],
+            vec![AccountMeta::new(counter_pubkey, true)],
         );
 
         // Send transaction with increment instruction
         let mut transaction =
             Transaction::new_with_payer(&[increment_instruction], Some(&payer.pubkey()));
-        transaction.sign(&[&payer, &counter_keypair], recent_blockhash);
+        transaction.sign(&[&payer], recent_blockhash);
         banks_client.process_transaction(transaction).await.unwrap();
 
         // Check account data
         let account = banks_client
-            .get_account(counter_keypair.pubkey())
+            .get_account(counter_pubkey)
             .await
             .expect("Failed to get counter account");
+
+        println!("account: {:?}", account);
 
         if let Some(account_data) = account {
             let counter: CounterAccount = CounterAccount::try_from_slice(&account_data.data)

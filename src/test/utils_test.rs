@@ -2,6 +2,7 @@
 mod utils_test {
 
     use crate::{
+        entrypoint::process_instruction,
         error::{AttpsAccountError, VerificationError},
         utils::{
             address_exists, address_pushback, create_related_account, pubkey_to_eth_address,
@@ -12,6 +13,7 @@ mod utils_test {
         account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey,
         secp256k1_recover::Secp256k1Pubkey,
     };
+    use solana_program_test::{processor, ProgramTest};
 
     #[test]
     fn test_pubkey_to_eth_address() {
@@ -251,12 +253,19 @@ mod utils_test {
         );
     }
 
-    // #[test]
-    // fn test_create_related_account() {
+    // #[tokio::test]
+    // async fn test_create_related_account() {
     //     let program_id = Pubkey::new_unique();
     //     let payer_key = Pubkey::new_unique();
+    //     let system_program_id = solana_program::system_program::id();
     //     let prefix = b"test";
     //     let phrase = b"phrase";
+
+    //     // Create mock environment
+    //     let (mut banks_client, payer, recent_blockhash) =
+    //         ProgramTest::new("attps_solana", program_id, processor!(process_instruction))
+    //             .start()
+    //             .await;
 
     //     // Create mock accounts
     //     let mut lamports = 0;
@@ -271,45 +280,58 @@ mod utils_test {
     //         false,
     //         0,
     //     );
+    //     let mut system_lamports = 0;
+    //     let mut system_data = vec![];
+    //     let system_program = AccountInfo::new(
+    //         &system_program_id,
+    //         false,
+    //         false,
+    //         &mut system_lamports,
+    //         &mut system_data,
+    //         &system_program_id,
+    //         false,
+    //         0,
+    //     );
 
     //     // Calculate expected PDA
     //     let (pda_pubkey, _) = Pubkey::find_program_address(&[prefix, phrase], &program_id);
-    //     let mut map_lamports = 0;
-    //     let mut map_data = vec![];
-    //     let map_account = AccountInfo::new(
+    //     let mut not_writable_map_lamports = 0;
+    //     let mut not_writable_map_data = vec![];
+    //     let not_writable_map_account = AccountInfo::new(
     //         &pda_pubkey,
     //         false, // Should fail because not writable
     //         true,
-    //         &mut map_lamports,
-    //         &mut map_data,
+    //         &mut not_writable_map_lamports,
+    //         &mut not_writable_map_data,
     //         &program_id,
     //         false,
     //         0,
     //     );
 
-    //     // Test not writable error
-    //     let result = create_related_account(
-    //         &program_id,
-    //         &payer_account,
-    //         &map_account,
-    //         prefix,
-    //         phrase,
-    //         100,
-    //     );
-    //     assert!(result.is_err());
-    //     assert!(matches!(
-    //         result.unwrap_err(),
-    //         ProgramError::Custom(2) // PdaAccountNotWritable
-    //     ));
+    //     // // Test not writable error
+    //     // let result = create_related_account(
+    //     //     &program_id,
+    //     //     &payer_account,
+    //     //     &not_writable_map_account,
+    //     //     prefix,
+    //     //     phrase,
+    //     //     100,
+    //     // );
+    //     // assert!(result.is_err());
+    //     // assert_eq!(
+    //     //     result.unwrap_err(),
+    //     //     AttpsAccountError::PdaAccountNotWritable.into()
+    //     // );
 
     //     // Test with writable but wrong pubkey
     //     let wrong_pubkey = Pubkey::new_unique();
+    //     let mut wrong_map_lamports = 0;
     //     let mut wrong_map_data = vec![];
     //     let wrong_map_account = AccountInfo::new(
     //         &wrong_pubkey,
     //         true,
     //         true,
-    //         &mut map_lamports,
+    //         &mut wrong_map_lamports,
     //         &mut wrong_map_data,
     //         &program_id,
     //         false,
@@ -320,23 +342,25 @@ mod utils_test {
     //         &program_id,
     //         &payer_account,
     //         &wrong_map_account,
+    //         &system_program,
     //         prefix,
     //         phrase,
     //         100,
     //     );
     //     assert!(result.is_err());
-    //     assert!(matches!(
+    //     assert_eq!(
     //         result.unwrap_err(),
-    //         ProgramError::Custom(1) // PdaAccountMismatch
-    //     ));
+    //         AttpsAccountError::PdaAccountMismatch.into()
+    //     );
 
     //     // Test with already created account
+    //     let mut existing_lamports = 0;
     //     let mut existing_data = vec![1; 10]; // Non-empty data
     //     let existing_account = AccountInfo::new(
     //         &pda_pubkey,
     //         true,
     //         true,
-    //         &mut map_lamports,
+    //         &mut existing_lamports,
     //         &mut existing_data,
     //         &program_id,
     //         false,
@@ -347,17 +371,19 @@ mod utils_test {
     //         &program_id,
     //         &payer_account,
     //         &existing_account,
+    //         &system_program,
     //         prefix,
     //         phrase,
     //         100,
     //     );
     //     assert!(result.is_err());
-    //     assert!(matches!(
+    //     assert_eq!(
     //         result.unwrap_err(),
-    //         ProgramError::Custom(3) // PdaAccountAlreadyCreated
-    //     ));
+    //         AttpsAccountError::PdaAccountAlreadyCreated.into()
+    //     );
 
     //     // Test successful account creation
+    //     let mut map_lamports = 0;
     //     let mut empty_data = vec![];
     //     let writable_account = AccountInfo::new(
     //         &pda_pubkey,
@@ -374,14 +400,16 @@ mod utils_test {
     //         &program_id,
     //         &payer_account,
     //         &writable_account,
+    //         &system_program,
     //         prefix,
     //         phrase,
     //         100,
     //     );
-    //     assert!(
-    //         result.is_ok(),
-    //         "Account creation should succeed with valid parameters"
-    //     );
+    //     println!("result: {:?}", result);
+    //     // assert!(
+    //     //     result.is_ok(),
+    //     //     "Account creation should succeed with valid parameters"
+    //     // );
     // }
 
     // #[test]

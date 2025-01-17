@@ -130,6 +130,7 @@ pub(crate) fn create_related_account<'a>(
     program_id: &Pubkey,
     payer_account: &AccountInfo<'a>,
     map_account: &AccountInfo<'a>,
+    system_program: &AccountInfo<'a>,
     prefix: &[u8],
     phrase: &[u8],
     data_length: usize,
@@ -142,6 +143,7 @@ pub(crate) fn create_related_account<'a>(
     } else if !map_account.data_is_empty() {
         Err(AttpsAccountError::PdaAccountAlreadyCreated.into())
     } else {
+        println!("rent get: {:?}", Rent::get());
         let rent = Rent::get()?;
         let rent_lamports = rent.minimum_balance(data_length);
         invoke_signed(
@@ -152,7 +154,7 @@ pub(crate) fn create_related_account<'a>(
                 data_length as u64,
                 program_id,
             ),
-            &[payer_account.clone(), map_account.clone()],
+            &[payer_account.clone(), map_account.clone(), system_program.clone()],
             &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
         )
     }
