@@ -1,8 +1,14 @@
-use crate::error::VerificationError;
+use crate::error::{AttpsAccountError, VerificationError};
 use solana_program::{
+    account_info::AccountInfo,
+    entrypoint::ProgramResult,
     keccak,
+    program::invoke_signed,
     program_error::ProgramError,
+    pubkey::Pubkey,
     secp256k1_recover::{secp256k1_recover, Secp256k1Pubkey},
+    system_instruction,
+    sysvar::{rent::Rent, Sysvar},
 };
 
 /// Check if an Ethereum-style address exists in a vector of addresses
@@ -118,4 +124,43 @@ pub(crate) fn verify_merkle(
     _merkle_proof: &[u8],
 ) -> Result<(), ProgramError> {
     Err(VerificationError::UnsupportedProofMethod.into())
+}
+
+pub(crate) fn create_related_account<'a>(
+    program_id: &Pubkey,
+    payer_account: &AccountInfo<'a>,
+    map_account: &AccountInfo<'a>,
+    prefix: &[u8],
+    phrase: &[u8],
+    data_length: usize,
+) -> ProgramResult {
+    let (pda_pubkey, bump) = Pubkey::find_program_address(&[prefix, phrase], program_id);
+    if pda_pubkey != *map_account.key {
+        Err(AttpsAccountError::PdaAccountMismatch.into())
+    } else if !map_account.is_writable {
+        Err(AttpsAccountError::PdaAccountNotWritable.into())
+    } else if !map_account.data_is_empty() {
+        Err(AttpsAccountError::PdaAccountAlreadyCreated.into())
+    } else {
+        let rent = Rent::get()?;
+        let rent_lamports = rent.minimum_balance(data_length);
+        invoke_signed(
+            &system_instruction::create_account(
+                payer_account.key,
+                map_account.key,
+                rent_lamports,
+                data_length as u64,
+                program_id,
+            ),
+            &[payer_account.clone(), map_account.clone()],
+            &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
+        )
+    }
+}
+
+pub(crate) fn write_related_account(map_account: &AccountInfo, content: &[u8]) -> ProgramResult {
+    // No need to check because only this program can rewrite the value
+    let mut account_data = map_account.data.borrow_mut();
+    account_data.copy_from_slice(content);
+    Ok(())
 }
