@@ -5,7 +5,6 @@ use solana_program_test::*;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     signature::Signer,
-    system_program,
     transaction::Transaction,
 };
 
@@ -44,7 +43,6 @@ mod instruction_test {
             vec![
                 AccountMeta::new(counter_pubkey, false),
                 AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program::id(), false),
             ],
         );
 

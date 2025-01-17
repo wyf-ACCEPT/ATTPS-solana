@@ -79,14 +79,12 @@ fn process_initialize_counter(
 
     let counter_account = next_account_info(accounts_iter)?;
     let payer_account = next_account_info(accounts_iter)?;
-    let system_program = next_account_info(accounts_iter)?;
 
     // Create a new data account for the counter
     create_related_account(
         program_id,
         payer_account,
         counter_account,
-        system_program,
         b"counter",
         b"-1",
         8, // data size

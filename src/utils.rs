@@ -131,7 +131,6 @@ pub(crate) fn create_related_account<'a>(
     program_id: &Pubkey,
     payer_account: &AccountInfo<'a>,
     map_account: &AccountInfo<'a>,
-    system_program: &AccountInfo<'a>,
     prefix: &[u8],
     phrase: &[u8],
     data_length: usize,
@@ -158,7 +157,6 @@ pub(crate) fn create_related_account<'a>(
             &[
                 payer_account.clone(),
                 map_account.clone(),
-                system_program.clone(),
             ],
             &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
         )
