@@ -1,6 +1,6 @@
 use crate::instruction::{AgentInstruction, CounterInstruction};
 use crate::state::{AgentSettings, CounterAccount, MessagePayload};
-use crate::utils::{create_related_account, write_related_account};
+use crate::utils::{create_related_account, read_account_data, write_account_data};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
@@ -84,29 +84,7 @@ fn process_initialize_counter(
     let payer_account = next_account_info(accounts_iter)?;
     let system_program = next_account_info(accounts_iter)?;
 
-    // // Size of our counter account
-    // let account_space = 8; // Size in bytes to store a u64
-
-    // // Calculate minimum balance for rent exemption
-    // let rent = Rent::get()?;
-    // let required_lamports = rent.minimum_balance(account_space);
-
-    // // Create the counter account
-    // invoke(
-    //     &system_instruction::create_account(
-    //         payer_account.key,    // Account paying for the new account
-    //         counter_account.key,  // Account to be created
-    //         required_lamports,    // Amount of lamports to transfer to the new account
-    //         account_space as u64, // Size in bytes to allocate for the data field
-    //         program_id,           // Set program owner to our program
-    //     ),
-    //     &[
-    //         payer_account.clone(),
-    //         counter_account.clone(),
-    //         system_program.clone(),
-    //     ],
-    // )?;
-
+    // Create a new data account for the counter
     create_related_account(
         program_id,
         payer_account,
@@ -114,24 +92,18 @@ fn process_initialize_counter(
         system_program,
         b"counter",
         b"-1",
-        8,
+        8, // data size
     )?;
 
-    // // Create a new CounterAccount struct with the initial value
-    // let counter_data = CounterAccount {
-    //     count: initial_value,
-    // };
-
-    // // Get a mutable reference to the counter account's data
-    // let mut account_data = &mut counter_account.data.borrow_mut()[..];
-
-    // // Serialize the CounterAccount struct into the account's data
-    // counter_data.serialize(&mut account_data)?;
-
-    write_related_account(counter_account, &initial_value.to_le_bytes())?;
+    // Write the initial value to the counter account
+    write_account_data(
+        counter_account,
+        CounterAccount {
+            count: initial_value,
+        },
+    )?;
 
     msg!("Counter initialized with value: {}", initial_value);
-
     Ok(())
 }
 
@@ -145,22 +117,17 @@ fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> P
         return Err(ProgramError::IncorrectProgramId);
     }
 
-    // Mutable borrow the account data
-    let mut data = counter_account.data.borrow_mut();
+    // Read the counter data
+    let mut counter_data: CounterAccount = read_account_data(counter_account)?;
 
-    // Deserialize the account data into our CounterAccount struct
-    let mut counter_data: CounterAccount = CounterAccount::try_from_slice(&data)?;
-
-    // Increment the counter value
+    // Increment the counter value and write back
     counter_data.count = counter_data
         .count
         .checked_add(1)
         .ok_or(ProgramError::InvalidAccountData)?;
-
-    // Serialize the updated counter data back into the account
-    counter_data.serialize(&mut &mut data[..])?;
-
     msg!("Counter incremented to: {}", counter_data.count);
+    write_account_data(counter_account, counter_data)?;
+
     Ok(())
 }
 

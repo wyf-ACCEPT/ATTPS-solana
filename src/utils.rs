@@ -1,4 +1,5 @@
 use crate::error::{AttpsAccountError, VerificationError};
+use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::AccountInfo,
     entrypoint::ProgramResult,
@@ -154,15 +155,29 @@ pub(crate) fn create_related_account<'a>(
                 data_length as u64,
                 program_id,
             ),
-            &[payer_account.clone(), map_account.clone(), system_program.clone()],
+            &[
+                payer_account.clone(),
+                map_account.clone(),
+                system_program.clone(),
+            ],
             &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
         )
     }
 }
 
-pub(crate) fn write_related_account(map_account: &AccountInfo, content: &[u8]) -> ProgramResult {
-    // No need to check because only this program can rewrite the value
-    let mut account_data = map_account.data.borrow_mut();
-    account_data.copy_from_slice(content);
-    Ok(())
+pub(crate) fn write_account_data<Data: BorshSerialize>(
+    data_account: &AccountInfo,
+    content: Data,
+) -> ProgramResult {
+    let mut account_data = &mut data_account.data.borrow_mut()[..];
+    content
+        .serialize(&mut account_data)
+        .map_err(|_| ProgramError::InvalidAccountData)
+}
+
+pub(crate) fn read_account_data<Data: BorshDeserialize>(
+    data_account: &AccountInfo,
+) -> Result<Data, ProgramError> {
+    let account_data = &data_account.data.borrow()[..];
+    Data::try_from_slice(account_data).map_err(|_| ProgramError::InvalidAccountData)
 }

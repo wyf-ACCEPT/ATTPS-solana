@@ -42,7 +42,7 @@ mod instruction_test {
             program_id,
             &init_instruction_data,
             vec![
-                AccountMeta::new(counter_pubkey, true),
+                AccountMeta::new(counter_pubkey, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
@@ -77,7 +77,7 @@ mod instruction_test {
         let increment_instruction = Instruction::new_with_bytes(
             program_id,
             &[1], // 1 = increment instruction
-            vec![AccountMeta::new(counter_pubkey, true)],
+            vec![AccountMeta::new(counter_pubkey, false)],
         );
 
         // Send transaction with increment instruction

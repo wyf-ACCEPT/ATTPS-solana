@@ -6,7 +6,7 @@ mod utils_test {
         error::{AttpsAccountError, VerificationError},
         utils::{
             address_exists, address_pushback, create_related_account, pubkey_to_eth_address,
-            verify_merkle, verify_signature, verify_zk, write_related_account,
+            verify_merkle, verify_signature, verify_zk, write_account_data,
         },
     };
     use solana_program::{
