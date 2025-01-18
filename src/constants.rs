@@ -13,5 +13,4 @@ impl Constants {
     pub const SIZE_AGENT_CONFIG: usize = 2048;
     pub const SIZE_CONTRACT_INFO: usize = 256;
     pub const SIZE_AGENT_INFO: usize = 4096;
-
 }

@@ -28,13 +28,8 @@ mod instruction_test {
         .await;
 
         // Get AgentCounter PDA
-        let (contract_info_pubkey, _) = Pubkey::find_program_address(
-            &[
-                Constants::PREFIX_CONTRACT_INFO,
-                b"",
-            ],
-            &program_id,
-        );
+        let (contract_info_pubkey, _) =
+            Pubkey::find_program_address(&[Constants::PREFIX_CONTRACT_INFO, b""], &program_id);
 
         // Step 1: Initialize the program
         println!("Testing program initialization...");
@@ -63,12 +58,12 @@ mod instruction_test {
 
         if let Some(account_data) = account {
             let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
-            let info: ContractInfo = ContractInfo::try_from_slice(&account_data.data[4..4 + length])
-                .expect("Failed to deserialize counter data");
+            let info: ContractInfo =
+                ContractInfo::try_from_slice(&account_data.data[4..4 + length])
+                    .expect("Failed to deserialize counter data");
             assert_eq!(info.agent_counter, 0);
             println!("✅ Agent counter initialized successfully");
         }
-
 
         // Step 2: Create an agent
         println!("Testing agent creation...");
@@ -95,7 +90,6 @@ mod instruction_test {
             Transaction::new_with_payer(&[create_instruction], Some(&payer.pubkey()));
         transaction.sign(&[&payer], recent_blockhash);
         banks_client.process_transaction(transaction).await.unwrap();
-
 
         // Step 3: Register an agent
         println!("Testing agent registration...");
@@ -185,8 +179,9 @@ mod instruction_test {
 
         if let Some(account_data) = account {
             let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
-            let info: ContractInfo = ContractInfo::try_from_slice(&account_data.data[4..4 + length])
-                .expect("Failed to deserialize counter data");
+            let info: ContractInfo =
+                ContractInfo::try_from_slice(&account_data.data[4..4 + length])
+                    .expect("Failed to deserialize counter data");
             assert_eq!(info.agent_counter, 1);
             println!("✅ Agent counter incremented successfully");
         }

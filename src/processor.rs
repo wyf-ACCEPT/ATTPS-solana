@@ -139,7 +139,10 @@ impl Processor {
 
         msg!("here: register agent");
         msg!("agent account: {:?}", agent_account.key);
-        msg!("agent account data: {:?}", &(agent_account.data).borrow()[..8]);
+        msg!(
+            "agent account data: {:?}",
+            &(agent_account.data).borrow()[..8]
+        );
 
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
         agent_info.agent_settings = agent_settings;

@@ -70,7 +70,9 @@ impl DataAccountUtils {
     ) -> ProgramResult {
         let account_data = &mut data_account.data.borrow_mut()[..];
         let mut buffer = Vec::new();
-        content.serialize(&mut buffer).map_err(|_| ProgramError::InvalidAccountData)?;
+        content
+            .serialize(&mut buffer)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
         account_data[..4].copy_from_slice(&(buffer.len() as u32).to_le_bytes());
         account_data[4..4 + buffer.len()].copy_from_slice(&buffer);
         Ok(())
