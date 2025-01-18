@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod utils_test {
-
-    use crate::{error::VerificationError, utils::AgentUtils};
-    use solana_program::secp256k1_recover::Secp256k1Pubkey;
+    use crate::{
+        error::{AgentHeaderError, VerificationError},
+        state::{AgentHeader, AgentSettings, MessageType, Priority},
+        utils::{AgentManagerUtils, AgentUtils},
+    };
+    use solana_program::{pubkey::Pubkey, secp256k1_recover::Secp256k1Pubkey};
 
     #[test]
     fn test_pubkey_to_eth_address() {
@@ -252,5 +255,120 @@ mod utils_test {
             result.unwrap_err(),
             VerificationError::UnsupportedProofMethod.into()
         );
+    }
+
+    #[test]
+    fn test_is_valid_uuid() {
+        // Valid UUIDs
+        assert!(AgentManagerUtils::is_valid_uuid(
+            "123e4567-e89b-4d3c-a456-426614174000"
+        ));
+        assert!(AgentManagerUtils::is_valid_uuid(
+            "987fcdeb-51a2-4bc3-9876-543210987654"
+        ));
+
+        // Invalid UUIDs
+        assert!(!AgentManagerUtils::is_valid_uuid("not-a-uuid"));
+        assert!(!AgentManagerUtils::is_valid_uuid(
+            "123e4567-e89b-1d3c-a456-426614174000"
+        )); // Wrong version
+        assert!(!AgentManagerUtils::is_valid_uuid(
+            "123e4567-e89b-4d3c-x456-426614174000"
+        )); // Invalid hex
+        assert!(!AgentManagerUtils::is_valid_uuid("123e4567-e89b-4d3c-a456")); // Too short
+        assert!(!AgentManagerUtils::is_valid_uuid(
+            "123e4567-e89b-4d3c-a456-4266141740001"
+        )); // Too long
+    }
+
+    #[test]
+    fn test_message_type_and_priority() {
+        // Test MessageType validation
+        assert!(AgentManagerUtils::is_valid_message_type(
+            &MessageType::Request
+        ));
+        assert!(AgentManagerUtils::is_valid_message_type(
+            &MessageType::Response
+        ));
+        assert!(AgentManagerUtils::is_valid_message_type(
+            &MessageType::Event
+        ));
+
+        // Test Priority validation
+        assert!(AgentManagerUtils::is_valid_priority(&Priority::High));
+        assert!(AgentManagerUtils::is_valid_priority(&Priority::Medium));
+        assert!(AgentManagerUtils::is_valid_priority(&Priority::Low));
+    }
+
+    #[test]
+    fn test_validate_agent_header() {
+        let valid_header = AgentHeader {
+            version: "1.0".to_string(),
+            message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
+            source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
+            source_agent_name: "Test Agent".to_string(),
+            target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
+            timestamp: 1234567890,
+            message_type: MessageType::Request,
+            priority: Priority::High,
+            ttl: 3600,
+        };
+
+        // Test valid header
+        assert!(AgentManagerUtils::validate_agent_header(&valid_header).is_ok());
+
+        // Test invalid version
+        let mut invalid_header = valid_header.clone();
+        invalid_header.version = "2.0".to_string();
+        assert_eq!(
+            AgentManagerUtils::validate_agent_header(&invalid_header).unwrap_err(),
+            AgentHeaderError::InvalidAgentHeaderVersion.into()
+        );
+
+        // Test invalid message_id
+        let mut invalid_header = valid_header.clone();
+        invalid_header.message_id = "invalid-uuid".to_string();
+        assert_eq!(
+            AgentManagerUtils::validate_agent_header(&invalid_header).unwrap_err(),
+            AgentHeaderError::InvalidAgentHeaderMessageId.into()
+        );
+
+        // Test invalid source_agent_id
+        let mut invalid_header = valid_header.clone();
+        invalid_header.source_agent_id = "invalid-uuid".to_string();
+        assert_eq!(
+            AgentManagerUtils::validate_agent_header(&invalid_header).unwrap_err(),
+            AgentHeaderError::InvalidAgentHeaderAgentId.into()
+        );
+    }
+
+    #[test]
+    fn test_setting_digest_from_settings_data() {
+        let agent = Pubkey::new_unique();
+        let settings = AgentSettings {
+            signers: vec![[2u8; 20], [3u8; 20]],
+            threshold: 2,
+            converter_address: Pubkey::new_unique(),
+            agent_header: AgentHeader {
+                version: "1.0".to_string(),
+                message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
+                source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
+                source_agent_name: "Test Agent".to_string(),
+                target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
+                timestamp: 1234567890,
+                message_type: MessageType::Request,
+                priority: Priority::High,
+                ttl: 3600,
+            },
+        };
+
+        let digest = AgentManagerUtils::setting_digest_from_settings_data(agent, &settings);
+
+        // Verify prefix bytes (0x0100)
+        assert_eq!(digest[0], 0x01);
+        assert_eq!(digest[1], 0x00);
+
+        // Verify remaining bytes are not all zero (hash was computed)
+        assert!(digest[2..].iter().any(|&x| x != 0));
     }
 }

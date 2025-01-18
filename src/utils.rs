@@ -71,23 +71,23 @@ impl DataAccountUtils {
 
 impl AgentUtils {
     /// Check if an Ethereum-style address exists in a vector of addresses
-    pub(crate) fn address_exists(addresses: &Vec<[u8; 20]>, target: &[u8; 20]) -> bool {
+    pub fn address_exists(addresses: &Vec<[u8; 20]>, target: &[u8; 20]) -> bool {
         addresses.iter().any(|addr| addr == target)
     }
 
     /// Add an Ethereum-style address to a vector if it doesn't exist
-    pub(crate) fn address_pushback(addresses: &mut Vec<[u8; 20]>, address: [u8; 20]) {
+    pub fn address_pushback(addresses: &mut Vec<[u8; 20]>, address: [u8; 20]) {
         addresses.push(address);
     }
 
     /// Convert a recovered Secp256k1 public key to an Ethereum address
-    pub(crate) fn pubkey_to_eth_address(pubkey: &Secp256k1Pubkey) -> [u8; 20] {
+    pub fn pubkey_to_eth_address(pubkey: &Secp256k1Pubkey) -> [u8; 20] {
         let hash = keccak::hash(&pubkey.to_bytes()).to_bytes();
         hash[12..32].try_into().unwrap()
     }
 
     /// Verify a signature proof against a message hash
-    pub(crate) fn verify_signature(
+    pub fn verify_signature(
         _settings_digest: &[u8; 32],
         message_hash: &[u8; 32],
         signature_proof: &[u8],
@@ -168,7 +168,7 @@ impl AgentUtils {
     }
 
     /// Verify a zero-knowledge proof (currently unsupported)
-    pub(crate) fn verify_zk(
+    pub fn verify_zk(
         _settings_digest: &[u8; 32],
         _message_hash: &[u8; 32],
         _zk_proof: &[u8],
@@ -177,7 +177,7 @@ impl AgentUtils {
     }
 
     /// Verify a Merkle proof (currently unsupported)
-    pub(crate) fn verify_merkle(
+    pub fn verify_merkle(
         _settings_digest: &[u8; 32],
         _message_hash: &[u8; 32],
         _merkle_proof: &[u8],
@@ -271,8 +271,18 @@ impl AgentManagerUtils {
         hash
     }
 
-    // is_valid_message_type: No need to check in Rust
-    // is_valid_priority: No need to check in Rust
+    /// Validates a message type enum value
+    pub fn is_valid_message_type(message_type: &MessageType) -> bool {
+        matches!(
+            message_type,
+            MessageType::Request | MessageType::Response | MessageType::Event
+        )
+    }
+
+    /// Validates a priority enum value
+    pub fn is_valid_priority(priority: &Priority) -> bool {
+        matches!(priority, Priority::High | Priority::Medium | Priority::Low)
+    }
 
     // _isAgentConfigExists: TODO
     // _getAgentConfigByDigest: TODO

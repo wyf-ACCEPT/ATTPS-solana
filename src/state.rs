@@ -168,9 +168,23 @@ pub struct ContractInfo {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentInfo {
+    pub agent_id: u128, // Unique auto-incrementing identifier
     pub is_allowed: bool,
     pub is_removed: bool,
     pub is_new_settings: bool,
     pub agent_settings: AgentSettings,
     pub agent_config: AgentConfig,
+}
+
+/// Counter for generating unique agent IDs.
+///
+/// # Size
+///
+/// Fixed size components:
+/// - current_id: 16 bytes (u128)
+///
+/// Total size = 16 bytes
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+pub struct AgentCounter {
+    pub current_id: u128,
 }

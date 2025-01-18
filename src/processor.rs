@@ -1,5 +1,9 @@
+use crate::constants::Constants;
+use crate::error::AttpsAccountError;
 use crate::instruction::{AgentInstruction, CounterInstruction};
-use crate::state::{AgentSettings, CounterAccount, MessagePayload};
+use crate::state::{
+    AgentConfig, AgentCounter, AgentInfo, AgentSettings, CounterAccount, MessagePayload,
+};
 use crate::utils::DataAccountUtils;
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
@@ -54,8 +58,42 @@ impl Processor {
         Ok(())
     }
 
-    fn process_initialize(_program_id: &Pubkey, _accounts: &[AccountInfo]) -> ProgramResult {
-        // TODO: Initialize contract state
+    fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+        let accounts_iter = &mut accounts.iter();
+        let counter_account = next_account_info(accounts_iter)?;
+        let payer_account = next_account_info(accounts_iter)?;
+
+        // Create AgentCounter PDA if it doesn't exist
+        let (counter_pda, _) = Pubkey::find_program_address(
+            &[
+                Constants::PREFIX_AGENT_COUNTER,
+                Constants::AGENT_COUNTER_SEED,
+            ],
+            program_id,
+        );
+
+        if counter_pda != *counter_account.key {
+            return Err(AttpsAccountError::PdaAccountMismatch.into());
+        }
+
+        if !counter_account.data_is_empty() {
+            return Err(AttpsAccountError::PdaAccountAlreadyCreated.into());
+        }
+
+        // Create and initialize the counter account
+        DataAccountUtils::create_related_account(
+            program_id,
+            payer_account,
+            counter_account,
+            Constants::PREFIX_AGENT_COUNTER,
+            Constants::AGENT_COUNTER_SEED,
+            Constants::AGENT_COUNTER_SIZE,
+        )?;
+
+        // Initialize counter with starting ID of 0
+        DataAccountUtils::write_account_data(counter_account, AgentCounter { current_id: 0 })?;
+
+        msg!("Agent counter initialized");
         Ok(())
     }
 
@@ -65,11 +103,85 @@ impl Processor {
     }
 
     fn process_register_agent(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_settings: AgentSettings,
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        agent_settings: AgentSettings,
     ) -> ProgramResult {
-        // TODO: Register agent with provided settings
+        let accounts_iter = &mut accounts.iter();
+        let agent_account = next_account_info(accounts_iter)?;
+        let payer_account = next_account_info(accounts_iter)?;
+        let counter_account = next_account_info(accounts_iter)?;
+
+        // Get or create counter PDA
+        let (counter_pda, _) = Pubkey::find_program_address(
+            &[
+                Constants::PREFIX_AGENT_COUNTER,
+                Constants::AGENT_COUNTER_SEED,
+            ],
+            program_id,
+        );
+        if counter_pda != *counter_account.key {
+            DataAccountUtils::create_related_account(
+                program_id,
+                payer_account,
+                counter_account,
+                Constants::PREFIX_AGENT_COUNTER,
+                Constants::AGENT_COUNTER_SEED,
+                Constants::AGENT_COUNTER_SIZE,
+            )?;
+            DataAccountUtils::write_account_data(counter_account, AgentCounter { current_id: 0 })?;
+        }
+
+        // Get current ID and increment
+        let mut counter: AgentCounter = DataAccountUtils::read_account_data(counter_account)?;
+        let agent_id = counter.current_id;
+        counter.current_id += 1;
+        DataAccountUtils::write_account_data(counter_account, counter)?;
+
+        // Create agent PDA
+        let id_bytes = agent_id.to_le_bytes();
+        DataAccountUtils::create_related_account(
+            program_id,
+            payer_account,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &id_bytes,
+            Constants::AGENT_INFO_SIZE,
+        )?;
+
+        // Initialize agent info with unique ID
+        let agent_info = AgentInfo {
+            agent_id, // Set from counter
+            is_allowed: false,
+            is_removed: false,
+            is_new_settings: false,
+            agent_settings: agent_settings.clone(),
+            agent_config: AgentConfig {
+                config_digest: [0; 32],
+                config_block_number: 0,
+                is_active: false,
+                settings: agent_settings,
+            },
+        };
+
+        // Debug log before writing
+        msg!("Writing agent info:");
+        msg!("- agent_id: {}", agent_info.agent_id);
+        msg!("- is_allowed: {}", agent_info.is_allowed);
+        msg!("- is_removed: {}", agent_info.is_removed);
+        msg!("- is_new_settings: {}", agent_info.is_new_settings);
+        msg!("- agent_settings: {:?}", agent_info.agent_settings);
+        msg!("- agent_config: {:?}", agent_info.agent_config);
+
+        // Serialize to check the data format
+        let mut data = vec![];
+        agent_info.serialize(&mut data).unwrap();
+        msg!("Serialized data length: {}", data.len());
+        msg!("First 32 bytes: {:?}", &data[..32.min(data.len())]);
+
+        DataAccountUtils::write_account_data(agent_account, agent_info)?;
+
+        msg!("Agent registered with ID: {}", agent_id);
         Ok(())
     }
 

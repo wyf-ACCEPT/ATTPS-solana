@@ -10,7 +10,7 @@ mod utils;
 mod test {
     pub mod instruction_test;
     pub mod state_test;
-    pub mod utils_test;
     pub mod utils_agent_test;
     pub mod utils_manager_test;
+    pub mod utils_test;
 }
