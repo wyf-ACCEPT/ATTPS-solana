@@ -1,8 +1,7 @@
 use crate::constants::Constants;
-use crate::error::AttpsAccountError;
 use crate::instruction::{AgentInstruction, CounterInstruction};
 use crate::state::{
-    AgentConfig, AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
+    AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
 };
 use crate::utils::DataAccountUtils;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -23,14 +22,37 @@ impl Processor {
         instruction_data: &[u8],
     ) -> ProgramResult {
         let instruction = AgentInstruction::unpack(instruction_data)?;
+        let accounts_iter = &mut accounts.iter();
+
         match instruction {
-            AgentInstruction::Initialize => Self::process_initialize(program_id, accounts)?,
-            AgentInstruction::CreateAgent => Self::process_create_agent(program_id, accounts)?,
+            AgentInstruction::Initialize => {
+                let payer_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                Self::process_initialize(program_id, payer_account, contract_info_account)
+            }
+            AgentInstruction::CreateAgent => {
+                let payer_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_create_agent(
+                    program_id,
+                    payer_account,
+                    contract_info_account,
+                    agent_account,
+                )
+            }
             AgentInstruction::RegisterAgent { agent_settings } => {
-                Self::process_register_agent(program_id, accounts, agent_settings)?
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_register_agent(
+                    program_id,
+                    contract_info_account,
+                    agent_account,
+                    agent_settings,
+                )
             }
             AgentInstruction::CreateAndRegisterAgent { agent_settings } => {
-                Self::process_create_and_register_agent(program_id, accounts, agent_settings)?
+                Self::process_create_and_register_agent(program_id, accounts, agent_settings)
             }
             AgentInstruction::ChangeAgentSettingProposal {
                 agent_id,
@@ -40,29 +62,28 @@ impl Processor {
                 accounts,
                 agent_id,
                 agent_settings,
-            )?,
+            ),
             AgentInstruction::Verify {
                 settings_digest,
                 payload,
-            } => Self::process_verify(program_id, accounts, settings_digest, payload)?,
+            } => Self::process_verify(program_id, accounts, settings_digest, payload),
             AgentInstruction::AcceptAgent { agent_id } => {
-                Self::process_accept_agent(program_id, accounts, agent_id)?
+                Self::process_accept_agent(program_id, accounts, agent_id)
             }
             AgentInstruction::AcceptAgentSettingProposal { agent_id } => {
-                Self::process_accept_agent_setting_proposal(program_id, accounts, agent_id)?
+                Self::process_accept_agent_setting_proposal(program_id, accounts, agent_id)
             }
             AgentInstruction::RemoveAgent { agent_id } => {
-                Self::process_remove_agent(program_id, accounts, agent_id)?
+                Self::process_remove_agent(program_id, accounts, agent_id)
             }
-        };
-        Ok(())
+        }
     }
 
-    fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-        let payer_account = next_account_info(accounts_iter)?;
-        let contract_info_account = next_account_info(accounts_iter)?;
-
+    fn process_initialize<'a>(
+        program_id: &Pubkey,
+        payer_account: &AccountInfo<'a>,
+        contract_info_account: &AccountInfo<'a>,
+    ) -> ProgramResult {
         // Create and initialize the counter account
         DataAccountUtils::create_related_account(
             program_id,
@@ -87,12 +108,12 @@ impl Processor {
         Ok(())
     }
 
-    fn process_create_agent(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-        let payer_account = next_account_info(accounts_iter)?;
-        let contract_info_account = next_account_info(accounts_iter)?;
-        let agent_account = next_account_info(accounts_iter)?;
-
+    fn process_create_agent<'a>(
+        program_id: &Pubkey,
+        payer_account: &AccountInfo<'a>,
+        contract_info_account: &AccountInfo<'a>,
+        agent_account: &AccountInfo<'a>,
+    ) -> ProgramResult {
         DataAccountUtils::check_account_match(
             program_id,
             contract_info_account,
@@ -121,29 +142,18 @@ impl Processor {
         Ok(())
     }
 
-    fn process_register_agent(
+    fn process_register_agent<'a>(
         program_id: &Pubkey,
-        accounts: &[AccountInfo],
+        contract_info_account: &AccountInfo<'a>,
+        agent_account: &AccountInfo<'a>,
         agent_settings: AgentSettings,
     ) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-        let contract_info_account = next_account_info(accounts_iter)?;
-        let agent_account = next_account_info(accounts_iter)?;
-
         DataAccountUtils::check_account_match(
             program_id,
             contract_info_account,
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-
-        msg!("here: register agent");
-        msg!("agent account: {:?}", agent_account.key);
-        msg!(
-            "agent account data: {:?}",
-            &(agent_account.data).borrow()[..8]
-        );
-
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
         agent_info.agent_settings = agent_settings;
 
@@ -154,11 +164,6 @@ impl Processor {
         msg!(" - is_new_settings: {}", agent_info.is_new_settings);
         msg!(" - agent_settings: {:?}", agent_info.agent_settings);
         msg!(" - agent_config: {:?}", agent_info.agent_config);
-
-        let mut data = vec![];
-        agent_info.serialize(&mut data).unwrap();
-        msg!("Serialized data length: {}", data.len());
-        msg!("First 32 bytes: {:?}", &data[..32.min(data.len())]);
 
         DataAccountUtils::write_account_data(agent_account, agent_info)?;
         Ok(())
