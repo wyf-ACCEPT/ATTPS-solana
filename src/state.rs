@@ -6,18 +6,20 @@ pub struct CounterAccount {
     pub count: u64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub enum MessageType {
+    #[default]
+    Event,
     Request,
     Response,
-    Event,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub enum Priority {
-    High,
-    Medium,
+    #[default]
     Low,
+    Medium,
+    High,
 }
 
 /// A message header containing routing and metadata information for agent communication.
@@ -31,7 +33,7 @@ pub enum Priority {
 /// - Each string field adds (4 + content length) bytes
 /// - Fixed fields add (8 + 1 + 1 + 8 = 18) bytes (timestamps, enums, etc)
 ///
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentHeader {
     pub version: String,
     pub message_id: String,
@@ -112,7 +114,7 @@ pub struct MessagePayload {
 /// - agent_header: See AgentHeader struct size calculation
 ///
 /// Total size = 37 + (20*signers.len()) + agent_header_size
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentSettings {
     pub signers: Vec<[u8; 20]>,
     pub threshold: u8,
@@ -133,7 +135,7 @@ pub struct AgentSettings {
 /// - settings: See AgentSettings struct size calculation
 ///
 /// Total size = 37 + settings_size
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentConfig {
     pub config_digest: [u8; 32],
     pub config_block_number: u32,
@@ -153,6 +155,9 @@ pub struct AgentConfig {
 ///   where config_size is the size of AgentConfig
 ///
 /// Total size = 36 + (configs.len() * config_size)
+///
+/// Size too large. Drop this.
+#[deprecated]
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct AgentConfigState {
     pub latest_config_digest: [u8; 32],
@@ -160,13 +165,36 @@ pub struct AgentConfigState {
 }
 
 /// Basic information about the contract.
+///
+/// # Size
+///
+/// Components:
+/// - agent_counter: 16 bytes (u128)
+/// - type_and_version: (4 + type_and_version.len()) bytes
+/// - agent_version: (4 + agent_version.len()) bytes
+///
+/// Total size = 24 + (type_and_version.len() + agent_version.len())
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct ContractInfo {
+    pub agent_counter: u128,
     pub type_and_version: String,
     pub agent_version: String,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+/// Information about an agent including its settings and status.
+///
+/// # Size
+///
+/// Components:
+/// - agent_id: 16 bytes (u128)
+/// - is_allowed: 1 byte (bool)
+/// - is_removed: 1 byte (bool)
+/// - is_new_settings: 1 byte (bool)
+/// - agent_settings: See AgentSettings struct size calculation
+/// - agent_config: See AgentConfig struct size calculation
+///
+/// Total size = 20 + settings_size + config_size
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentInfo {
     pub agent_id: u128, // Unique auto-incrementing identifier
     pub is_allowed: bool,
@@ -174,17 +202,4 @@ pub struct AgentInfo {
     pub is_new_settings: bool,
     pub agent_settings: AgentSettings,
     pub agent_config: AgentConfig,
-}
-
-/// Counter for generating unique agent IDs.
-///
-/// # Size
-///
-/// Fixed size components:
-/// - current_id: 16 bytes (u128)
-///
-/// Total size = 16 bytes
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
-pub struct AgentCounter {
-    pub current_id: u128,
 }

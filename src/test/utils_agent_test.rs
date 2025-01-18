@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod utils_test {
+mod utils_agent_test {
 
     use crate::{error::VerificationError, utils::AgentUtils};
     use solana_program::secp256k1_recover::Secp256k1Pubkey;

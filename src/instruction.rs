@@ -44,10 +44,24 @@ impl CounterInstruction {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum AgentInstruction {
+
+    /// Initialize the contract
+    /// 
+    /// 0. [signer] payer
+    /// 1. [writable] contract_info
     Initialize,
 
+    /// Create a new agent (create a new data account)
+    /// 
+    /// 0. [signer] payer
+    /// 1. [writable] contract_info
+    /// 2. [writable] agent data account
     CreateAgent,
 
+    /// Register an agent (write to agent data account)
+    /// 
+    /// 0. [writable] contract_info
+    /// 1. [writable] agent data account
     RegisterAgent {
         agent_settings: AgentSettings,
     },

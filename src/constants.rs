@@ -1,11 +1,17 @@
 pub struct Constants;
 
 impl Constants {
+    pub const PREFIX_CONTRACT_INFO: &'static [u8] = b"contract-info";
     pub const PREFIX_AGENT_ADDRESS: &'static [u8] = b"agent";
-    pub const PREFIX_AGENT_COUNTER: &'static [u8] = b"agent_counter";
-    pub const AGENT_COUNTER_SEED: &'static [u8] = b"-1";
 
     // Account sizes
-    pub const AGENT_INFO_SIZE: usize = 528; // Size for AgentInfo account data (matched to actual serialized size)
-    pub const AGENT_COUNTER_SIZE: usize = 16; // Size for AgentCounter (u128)
+    pub const SIZE_AGENT_HEADER: usize = 256;
+    pub const SIZE_PROOF: usize = 256;
+    pub const SIZE_METADATA: usize = 256;
+    pub const SIZE_MESSAGE_PAYLOAD: usize = 2048;
+    pub const SIZE_AGENT_SETTINGS: usize = 2048;
+    pub const SIZE_AGENT_CONFIG: usize = 2048;
+    pub const SIZE_CONTRACT_INFO: usize = 256;
+    pub const SIZE_AGENT_INFO: usize = 4096;
+
 }

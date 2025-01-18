@@ -2,7 +2,7 @@ use crate::constants::Constants;
 use crate::error::AttpsAccountError;
 use crate::instruction::{AgentInstruction, CounterInstruction};
 use crate::state::{
-    AgentConfig, AgentCounter, AgentInfo, AgentSettings, CounterAccount, MessagePayload,
+    AgentConfig, AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
 };
 use crate::utils::DataAccountUtils;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -60,45 +60,64 @@ impl Processor {
 
     fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
-        let counter_account = next_account_info(accounts_iter)?;
         let payer_account = next_account_info(accounts_iter)?;
-
-        // Create AgentCounter PDA if it doesn't exist
-        let (counter_pda, _) = Pubkey::find_program_address(
-            &[
-                Constants::PREFIX_AGENT_COUNTER,
-                Constants::AGENT_COUNTER_SEED,
-            ],
-            program_id,
-        );
-
-        if counter_pda != *counter_account.key {
-            return Err(AttpsAccountError::PdaAccountMismatch.into());
-        }
-
-        if !counter_account.data_is_empty() {
-            return Err(AttpsAccountError::PdaAccountAlreadyCreated.into());
-        }
+        let contract_info_account = next_account_info(accounts_iter)?;
 
         // Create and initialize the counter account
         DataAccountUtils::create_related_account(
             program_id,
             payer_account,
-            counter_account,
-            Constants::PREFIX_AGENT_COUNTER,
-            Constants::AGENT_COUNTER_SEED,
-            Constants::AGENT_COUNTER_SIZE,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
+            Constants::SIZE_CONTRACT_INFO,
         )?;
 
         // Initialize counter with starting ID of 0
-        DataAccountUtils::write_account_data(counter_account, AgentCounter { current_id: 0 })?;
+        DataAccountUtils::write_account_data(
+            contract_info_account,
+            ContractInfo {
+                agent_counter: 0,
+                type_and_version: "AI Agent 1.0.0".to_string(),
+                agent_version: "AI Agent 1.0.0".to_string(),
+            },
+        )?;
 
-        msg!("Agent counter initialized");
+        msg!("Contract info data account initialized");
         Ok(())
     }
 
-    fn process_create_agent(_program_id: &Pubkey, _accounts: &[AccountInfo]) -> ProgramResult {
-        // TODO: Create new agent
+    fn process_create_agent(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+        let accounts_iter = &mut accounts.iter();
+        let payer_account = next_account_info(accounts_iter)?;
+        let contract_info_account = next_account_info(accounts_iter)?;
+        let agent_account = next_account_info(accounts_iter)?;
+
+        DataAccountUtils::check_account_match(
+            program_id,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
+        )?;
+
+        let mut info: ContractInfo = DataAccountUtils::read_account_data(contract_info_account)?;
+
+        DataAccountUtils::create_related_account(
+            program_id,
+            payer_account,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &info.agent_counter.to_le_bytes(),
+            Constants::SIZE_AGENT_INFO,
+        )?;
+
+        let mut agent_info = AgentInfo::default();
+        agent_info.agent_id = info.agent_counter;
+        DataAccountUtils::write_account_data(agent_account, agent_info)?;
+
+        info.agent_counter += 1;
+        DataAccountUtils::write_account_data(contract_info_account, info)?;
+
         Ok(())
     }
 
@@ -108,80 +127,37 @@ impl Processor {
         agent_settings: AgentSettings,
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
+        let contract_info_account = next_account_info(accounts_iter)?;
         let agent_account = next_account_info(accounts_iter)?;
-        let payer_account = next_account_info(accounts_iter)?;
-        let counter_account = next_account_info(accounts_iter)?;
 
-        // Get or create counter PDA
-        let (counter_pda, _) = Pubkey::find_program_address(
-            &[
-                Constants::PREFIX_AGENT_COUNTER,
-                Constants::AGENT_COUNTER_SEED,
-            ],
+        DataAccountUtils::check_account_match(
             program_id,
-        );
-        if counter_pda != *counter_account.key {
-            DataAccountUtils::create_related_account(
-                program_id,
-                payer_account,
-                counter_account,
-                Constants::PREFIX_AGENT_COUNTER,
-                Constants::AGENT_COUNTER_SEED,
-                Constants::AGENT_COUNTER_SIZE,
-            )?;
-            DataAccountUtils::write_account_data(counter_account, AgentCounter { current_id: 0 })?;
-        }
-
-        // Get current ID and increment
-        let mut counter: AgentCounter = DataAccountUtils::read_account_data(counter_account)?;
-        let agent_id = counter.current_id;
-        counter.current_id += 1;
-        DataAccountUtils::write_account_data(counter_account, counter)?;
-
-        // Create agent PDA
-        let id_bytes = agent_id.to_le_bytes();
-        DataAccountUtils::create_related_account(
-            program_id,
-            payer_account,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &id_bytes,
-            Constants::AGENT_INFO_SIZE,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
         )?;
 
-        // Initialize agent info with unique ID
-        let agent_info = AgentInfo {
-            agent_id, // Set from counter
-            is_allowed: false,
-            is_removed: false,
-            is_new_settings: false,
-            agent_settings: agent_settings.clone(),
-            agent_config: AgentConfig {
-                config_digest: [0; 32],
-                config_block_number: 0,
-                is_active: false,
-                settings: agent_settings,
-            },
-        };
+        msg!("here: register agent");
+        msg!("agent account: {:?}", agent_account.key);
+        msg!("agent account data: {:?}", &(agent_account.data).borrow()[..8]);
 
-        // Debug log before writing
+        let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+        agent_info.agent_settings = agent_settings;
+
         msg!("Writing agent info:");
-        msg!("- agent_id: {}", agent_info.agent_id);
-        msg!("- is_allowed: {}", agent_info.is_allowed);
-        msg!("- is_removed: {}", agent_info.is_removed);
-        msg!("- is_new_settings: {}", agent_info.is_new_settings);
-        msg!("- agent_settings: {:?}", agent_info.agent_settings);
-        msg!("- agent_config: {:?}", agent_info.agent_config);
+        msg!(" - agent_id: {}", agent_info.agent_id);
+        msg!(" - is_allowed: {}", agent_info.is_allowed);
+        msg!(" - is_removed: {}", agent_info.is_removed);
+        msg!(" - is_new_settings: {}", agent_info.is_new_settings);
+        msg!(" - agent_settings: {:?}", agent_info.agent_settings);
+        msg!(" - agent_config: {:?}", agent_info.agent_config);
 
-        // Serialize to check the data format
         let mut data = vec![];
         agent_info.serialize(&mut data).unwrap();
         msg!("Serialized data length: {}", data.len());
         msg!("First 32 bytes: {:?}", &data[..32.min(data.len())]);
 
         DataAccountUtils::write_account_data(agent_account, agent_info)?;
-
-        msg!("Agent registered with ID: {}", agent_id);
         Ok(())
     }
 
@@ -278,14 +254,14 @@ impl CounterProcessor {
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
 
-        let counter_account = next_account_info(accounts_iter)?;
+        let contract_info_account = next_account_info(accounts_iter)?;
         let payer_account = next_account_info(accounts_iter)?;
 
         // Create a new data account for the counter
         DataAccountUtils::create_related_account(
             program_id,
             payer_account,
-            counter_account,
+            contract_info_account,
             b"counter",
             b"-1",
             8, // data size
@@ -293,7 +269,7 @@ impl CounterProcessor {
 
         // Write the initial value to the counter account
         DataAccountUtils::write_account_data(
-            counter_account,
+            contract_info_account,
             CounterAccount {
                 count: initial_value,
             },
@@ -306,16 +282,16 @@ impl CounterProcessor {
     // Update an existing counter's value
     fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
-        let counter_account = next_account_info(accounts_iter)?;
+        let contract_info_account = next_account_info(accounts_iter)?;
 
         // Verify account ownership
-        if counter_account.owner != program_id {
+        if contract_info_account.owner != program_id {
             return Err(ProgramError::IncorrectProgramId);
         }
 
         // Read the counter data
         let mut counter_data: CounterAccount =
-            DataAccountUtils::read_account_data(counter_account)?;
+            DataAccountUtils::read_account_data(contract_info_account)?;
 
         // Increment the counter value and write back
         counter_data.count = counter_data
@@ -323,7 +299,7 @@ impl CounterProcessor {
             .checked_add(1)
             .ok_or(ProgramError::InvalidAccountData)?;
         msg!("Counter incremented to: {}", counter_data.count);
-        DataAccountUtils::write_account_data(counter_account, counter_data)?;
+        DataAccountUtils::write_account_data(contract_info_account, counter_data)?;
 
         Ok(())
     }
@@ -334,15 +310,15 @@ impl CounterProcessor {
         amount: u64,
     ) -> ProgramResult {
         let accounts_iter = &mut accounts.iter();
-        let counter_account = next_account_info(accounts_iter)?;
+        let contract_info_account = next_account_info(accounts_iter)?;
 
         // Verify account ownership
-        if counter_account.owner != program_id {
+        if contract_info_account.owner != program_id {
             return Err(ProgramError::IncorrectProgramId);
         }
 
         // Mutable borrow the account data
-        let mut data = counter_account.data.borrow_mut();
+        let mut data = contract_info_account.data.borrow_mut();
 
         // Deserialize the account data into our CounterAccount struct
         let mut counter_data: CounterAccount = CounterAccount::try_from_slice(&data)?;

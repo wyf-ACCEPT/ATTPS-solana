@@ -342,33 +342,4 @@ mod utils_test {
         );
     }
 
-    #[test]
-    fn test_setting_digest_from_settings_data() {
-        let agent = Pubkey::new_unique();
-        let settings = AgentSettings {
-            signers: vec![[2u8; 20], [3u8; 20]],
-            threshold: 2,
-            converter_address: Pubkey::new_unique(),
-            agent_header: AgentHeader {
-                version: "1.0".to_string(),
-                message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
-                source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
-                source_agent_name: "Test Agent".to_string(),
-                target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
-                timestamp: 1234567890,
-                message_type: MessageType::Request,
-                priority: Priority::High,
-                ttl: 3600,
-            },
-        };
-
-        let digest = AgentManagerUtils::setting_digest_from_settings_data(agent, &settings);
-
-        // Verify prefix bytes (0x0100)
-        assert_eq!(digest[0], 0x01);
-        assert_eq!(digest[1], 0x00);
-
-        // Verify remaining bytes are not all zero (hash was computed)
-        assert!(digest[2..].iter().any(|&x| x != 0));
-    }
 }

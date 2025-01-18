@@ -1,5 +1,5 @@
 use crate::constants::Constants;
-use crate::state::{AgentCounter, AgentHeader, AgentInfo, AgentSettings, MessageType, Priority};
+use crate::state::{AgentHeader, AgentInfo, AgentSettings, MessageType, Priority};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{pubkey::Pubkey, system_program};
 use solana_program_test::*;
@@ -11,10 +11,12 @@ use solana_sdk::{
 
 #[cfg(test)]
 mod instruction_test {
+    use crate::state::ContractInfo;
+
     use super::*;
 
     #[tokio::test]
-    async fn test_initialize_register_agent() {
+    async fn test_initialize_create_register() {
         use crate::processor::Processor;
         let program_id = Pubkey::new_unique();
         let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
@@ -26,10 +28,10 @@ mod instruction_test {
         .await;
 
         // Get AgentCounter PDA
-        let (counter_pubkey, _) = Pubkey::find_program_address(
+        let (contract_info_pubkey, _) = Pubkey::find_program_address(
             &[
-                Constants::PREFIX_AGENT_COUNTER,
-                Constants::AGENT_COUNTER_SEED,
+                Constants::PREFIX_CONTRACT_INFO,
+                b"",
             ],
             &program_id,
         );
@@ -41,8 +43,8 @@ mod instruction_test {
             program_id,
             &[0], // 0 = Initialize instruction
             vec![
-                AccountMeta::new(counter_pubkey, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
         );
@@ -55,18 +57,47 @@ mod instruction_test {
 
         // Verify counter was created and initialized to 0
         let account = banks_client
-            .get_account(counter_pubkey)
+            .get_account(contract_info_pubkey)
             .await
             .expect("Failed to get counter account");
 
         if let Some(account_data) = account {
-            let counter: AgentCounter = AgentCounter::try_from_slice(&account_data.data)
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            let info: ContractInfo = ContractInfo::try_from_slice(&account_data.data[4..4 + length])
                 .expect("Failed to deserialize counter data");
-            assert_eq!(counter.current_id, 0);
+            assert_eq!(info.agent_counter, 0);
             println!("✅ Agent counter initialized successfully");
         }
 
-        // Step 2: Register an agent
+
+        // Step 2: Create an agent
+        println!("Testing agent creation...");
+
+        // Get agent PDA (will be created by instruction)
+        let agent_id_bytes = 0u128.to_le_bytes();
+        let (agent_pubkey, _) = Pubkey::find_program_address(
+            &[Constants::PREFIX_AGENT_ADDRESS, &agent_id_bytes],
+            &program_id,
+        );
+        let create_instruction = Instruction::new_with_bytes(
+            program_id,
+            &[1], // 1 = CreateAgent instruction
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        // Send transaction with create instruction
+        let mut transaction =
+            Transaction::new_with_payer(&[create_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+
+        // Step 3: Register an agent
         println!("Testing agent registration...");
 
         // Create sample agent settings
@@ -93,20 +124,12 @@ mod instruction_test {
             .serialize(&mut register_instruction_data)
             .unwrap();
 
-        // Get agent PDA (will be created by instruction)
-        let agent_id_bytes = 0u128.to_le_bytes();
-        let (agent_pubkey, _) = Pubkey::find_program_address(
-            &[Constants::PREFIX_AGENT_ADDRESS, &agent_id_bytes],
-            &program_id,
-        );
-
         let register_instruction = Instruction::new_with_bytes(
             program_id,
             &register_instruction_data,
             vec![
+                AccountMeta::new(contract_info_pubkey, false),
                 AccountMeta::new(agent_pubkey, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new(counter_pubkey, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
         );
@@ -130,7 +153,10 @@ mod instruction_test {
                 &account_data.data[..32.min(account_data.data.len())]
             );
 
-            match AgentInfo::try_from_slice(&account_data.data) {
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            println!("Real agent info length: {}", length);
+
+            match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
                 Ok(agent) => {
                     assert_eq!(agent.agent_id, 0);
                     assert_eq!(agent.is_allowed, false);
@@ -153,14 +179,15 @@ mod instruction_test {
 
         // Verify counter was incremented
         let account = banks_client
-            .get_account(counter_pubkey)
+            .get_account(contract_info_pubkey)
             .await
             .expect("Failed to get counter account");
 
         if let Some(account_data) = account {
-            let counter: AgentCounter = AgentCounter::try_from_slice(&account_data.data)
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            let info: ContractInfo = ContractInfo::try_from_slice(&account_data.data[4..4 + length])
                 .expect("Failed to deserialize counter data");
-            assert_eq!(counter.current_id, 1);
+            assert_eq!(info.agent_counter, 1);
             println!("✅ Agent counter incremented successfully");
         }
     }

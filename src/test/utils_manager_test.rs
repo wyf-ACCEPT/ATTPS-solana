@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod utils_test {
+mod utils_manager_test {
 
     use crate::{
         error::AgentHeaderError,
@@ -88,8 +88,8 @@ mod utils_test {
                 source_agent_name: "Test Agent".to_string(),
                 target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
                 timestamp: 1234567890,
-                message_type: MessageType::Request,
-                priority: Priority::High,
+                message_type: MessageType::Event,
+                priority: Priority::Low,
                 ttl: 3600,
             },
         };

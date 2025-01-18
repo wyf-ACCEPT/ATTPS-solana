@@ -18,7 +18,7 @@ pub struct AgentUtils;
 pub struct AgentManagerUtils;
 
 impl DataAccountUtils {
-    pub(crate) fn create_related_account<'a>(
+    pub fn create_related_account<'a>(
         program_id: &Pubkey,
         payer_account: &AccountInfo<'a>,
         map_account: &AccountInfo<'a>,
@@ -51,21 +51,38 @@ impl DataAccountUtils {
         }
     }
 
-    pub(crate) fn write_account_data<Data: BorshSerialize>(
+    pub fn check_account_match(
+        program_id: &Pubkey,
+        account: &AccountInfo,
+        prefix: &[u8],
+        phrase: &[u8],
+    ) -> ProgramResult {
+        let (pda_pubkey, _) = Pubkey::find_program_address(&[prefix, phrase], program_id);
+        match account.key == &pda_pubkey {
+            true => Ok(()),
+            false => Err(AttpsAccountError::PdaAccountMismatch.into()),
+        }
+    }
+
+    pub fn write_account_data<Data: BorshSerialize>(
         data_account: &AccountInfo,
         content: Data,
     ) -> ProgramResult {
-        let mut account_data = &mut data_account.data.borrow_mut()[..];
-        content
-            .serialize(&mut account_data)
-            .map_err(|_| ProgramError::InvalidAccountData)
+        let account_data = &mut data_account.data.borrow_mut()[..];
+        let mut buffer = Vec::new();
+        content.serialize(&mut buffer).map_err(|_| ProgramError::InvalidAccountData)?;
+        account_data[..4].copy_from_slice(&(buffer.len() as u32).to_le_bytes());
+        account_data[4..4 + buffer.len()].copy_from_slice(&buffer);
+        Ok(())
     }
 
-    pub(crate) fn read_account_data<Data: BorshDeserialize>(
+    pub fn read_account_data<Data: BorshDeserialize>(
         data_account: &AccountInfo,
     ) -> Result<Data, ProgramError> {
         let account_data = &data_account.data.borrow()[..];
-        Data::try_from_slice(account_data).map_err(|_| ProgramError::InvalidAccountData)
+        let data_len = u32::from_le_bytes(account_data[..4].try_into().unwrap()) as usize;
+        Data::try_from_slice(&account_data[4..4 + data_len])
+            .map_err(|_| ProgramError::InvalidAccountData)
     }
 }
 
