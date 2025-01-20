@@ -1,16 +1,19 @@
 use crate::constants::Constants;
+use crate::error::{AgentHeaderError, AttpsAccountError};
 use crate::instruction::{AgentInstruction, CounterInstruction};
 use crate::state::{
-    AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
+    AgentConfig, AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
 };
-use crate::utils::DataAccountUtils;
+use crate::utils::{AgentManagerUtils, DataAccountUtils};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
+    clock::Clock,
     entrypoint::ProgramResult,
     msg,
     program_error::ProgramError,
     pubkey::Pubkey,
+    sysvar::Sysvar,
 };
 
 pub struct Processor;
@@ -27,8 +30,14 @@ impl Processor {
         match instruction {
             AgentInstruction::Initialize => {
                 let payer_account = next_account_info(accounts_iter)?;
+                let owner_account = next_account_info(accounts_iter)?;
                 let contract_info_account = next_account_info(accounts_iter)?;
-                Self::process_initialize(program_id, payer_account, contract_info_account)
+                Self::process_initialize(
+                    program_id,
+                    payer_account,
+                    owner_account,
+                    contract_info_account,
+                )
             }
             AgentInstruction::CreateAgent => {
                 let payer_account = next_account_info(accounts_iter)?;
@@ -52,23 +61,40 @@ impl Processor {
                 )
             }
             AgentInstruction::CreateAndRegisterAgent { agent_settings } => {
-                Self::process_create_and_register_agent(program_id, accounts, agent_settings)
+                let payer_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_create_and_register_agent(
+                    program_id,
+                    payer_account,
+                    contract_info_account,
+                    agent_account,
+                    agent_settings,
+                )
+            }
+            AgentInstruction::AcceptAgent { agent_id } => {
+                let owner_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_accept_agent(
+                    program_id,
+                    owner_account,
+                    contract_info_account,
+                    agent_account,
+                    agent_id,
+                )
             }
             AgentInstruction::ChangeAgentSettingProposal {
                 agent_id,
-                agent_settings,
-            } => Self::process_change_agent_setting_proposal(
-                program_id,
-                accounts,
-                agent_id,
-                agent_settings,
-            ),
-            AgentInstruction::Verify {
-                settings_digest,
-                payload,
-            } => Self::process_verify(program_id, accounts, settings_digest, payload),
-            AgentInstruction::AcceptAgent { agent_id } => {
-                Self::process_accept_agent(program_id, accounts, agent_id)
+                new_agent_settings,
+            } => {
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_change_agent_setting_proposal(
+                    program_id,
+                    agent_account,
+                    agent_id,
+                    new_agent_settings,
+                )
             }
             AgentInstruction::AcceptAgentSettingProposal { agent_id } => {
                 Self::process_accept_agent_setting_proposal(program_id, accounts, agent_id)
@@ -76,12 +102,17 @@ impl Processor {
             AgentInstruction::RemoveAgent { agent_id } => {
                 Self::process_remove_agent(program_id, accounts, agent_id)
             }
+            AgentInstruction::Verify {
+                settings_digest,
+                payload,
+            } => Self::process_verify(program_id, accounts, settings_digest, payload),
         }
     }
 
     fn process_initialize<'a>(
         program_id: &Pubkey,
         payer_account: &AccountInfo<'a>,
+        owner_account: &AccountInfo,
         contract_info_account: &AccountInfo<'a>,
     ) -> ProgramResult {
         // Create and initialize the counter account
@@ -98,6 +129,7 @@ impl Processor {
         DataAccountUtils::write_account_data(
             contract_info_account,
             ContractInfo {
+                owner: *owner_account.key,
                 agent_counter: 0,
                 type_and_version: "AI Agent 1.0.0".to_string(),
                 agent_version: "AI Agent 1.0.0".to_string(),
@@ -120,7 +152,6 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-
         let mut info: ContractInfo = DataAccountUtils::read_account_data(contract_info_account)?;
 
         DataAccountUtils::create_related_account(
@@ -142,12 +173,13 @@ impl Processor {
         Ok(())
     }
 
-    fn process_register_agent<'a>(
+    fn process_register_agent(
         program_id: &Pubkey,
-        contract_info_account: &AccountInfo<'a>,
-        agent_account: &AccountInfo<'a>,
+        contract_info_account: &AccountInfo,
+        agent_account: &AccountInfo,
         agent_settings: AgentSettings,
     ) -> ProgramResult {
+        AgentManagerUtils::validate_agent_header(&agent_settings.agent_header)?;
         DataAccountUtils::check_account_match(
             program_id,
             contract_info_account,
@@ -155,56 +187,137 @@ impl Processor {
             b"",
         )?;
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
-        agent_info.agent_settings = agent_settings;
 
-        msg!("Writing agent info:");
-        msg!(" - agent_id: {}", agent_info.agent_id);
-        msg!(" - is_allowed: {}", agent_info.is_allowed);
-        msg!(" - is_removed: {}", agent_info.is_removed);
-        msg!(" - is_new_settings: {}", agent_info.is_new_settings);
-        msg!(" - agent_settings: {:?}", agent_info.agent_settings);
-        msg!(" - agent_config: {:?}", agent_info.agent_config);
-
-        DataAccountUtils::write_account_data(agent_account, agent_info)?;
-        Ok(())
+        if agent_info.is_registered {
+            Err(AttpsAccountError::AgentAlreadyRegistered.into())
+        } else if agent_info.is_allowed {
+            Err(AttpsAccountError::AgentAlreadyAllowed.into())
+        } else if agent_info.is_removed {
+            Err(AttpsAccountError::AgentAlreadyRemoved.into())
+        } else {
+            agent_info.is_registered = true;
+            agent_info.is_new_settings = true;
+            agent_info.agent_settings = agent_settings;
+            msg!("Writing agent info:");
+            msg!(" - agent_id: {}", agent_info.agent_id);
+            msg!(" - is_registered: {}", agent_info.is_registered);
+            msg!(" - is_allowed: {}", agent_info.is_allowed);
+            msg!(" - is_removed: {}", agent_info.is_removed);
+            msg!(" - is_new_settings: {}", agent_info.is_new_settings);
+            msg!(" - agent_settings: {:?}", agent_info.agent_settings);
+            msg!(" - agent_config: {:?}", agent_info.agent_config);
+            DataAccountUtils::write_account_data(agent_account, agent_info)
+        }
     }
 
-    fn process_create_and_register_agent(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_settings: AgentSettings,
+    fn process_create_and_register_agent<'a>(
+        program_id: &Pubkey,
+        payer_account: &AccountInfo<'a>,
+        contract_info_account: &AccountInfo<'a>,
+        agent_account: &AccountInfo<'a>,
+        agent_settings: AgentSettings,
     ) -> ProgramResult {
-        // TODO: Create and register agent in one transaction
-        Ok(())
-    }
-
-    fn process_change_agent_setting_proposal(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_id: u128,
-        _agent_settings: AgentSettings,
-    ) -> ProgramResult {
-        // TODO: Process agent setting change proposal
-        Ok(())
-    }
-
-    fn process_verify(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _settings_digest: [u8; 32],
-        _payload: MessagePayload,
-    ) -> ProgramResult {
-        // TODO: Verify message payload
-        Ok(())
+        Self::process_create_agent(
+            program_id,
+            payer_account,
+            contract_info_account,
+            agent_account,
+        )?;
+        Self::process_register_agent(
+            program_id,
+            contract_info_account,
+            agent_account,
+            agent_settings,
+        )
     }
 
     fn process_accept_agent(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_id: u128,
+        program_id: &Pubkey,
+        owner_account: &AccountInfo,
+        contract_info_account: &AccountInfo,
+        agent_account: &AccountInfo,
+        agent_id: u128,
     ) -> ProgramResult {
-        // TODO: Accept agent registration
-        Ok(())
+        let contract_info: ContractInfo =
+            DataAccountUtils::read_account_data(contract_info_account)?;
+        contract_info.only_owner(owner_account.key)?;
+
+        DataAccountUtils::check_account_match(
+            program_id,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
+        )?;
+        DataAccountUtils::check_account_match(
+            program_id,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &agent_id.to_le_bytes(),
+        )?;
+
+        let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+        if !agent_info.is_registered {
+            Err(AttpsAccountError::AgentNotRegistered.into())
+        } else if agent_info.is_allowed {
+            agent_info.is_registered = false;
+            Ok(())
+        } else {
+            agent_info.is_registered = false;
+            agent_info.is_allowed = true;
+            agent_info.is_new_settings = false;
+
+            let settings = agent_info.agent_settings.clone();
+            let config = AgentConfig {
+                config_digest: AgentManagerUtils::setting_digest_from_settings_data(
+                    *agent_account.key,
+                    &settings,
+                ),
+                config_block_number: Clock::get()?.slot,
+                is_active: true,
+                settings,
+            };
+            agent_info.agent_config = config;
+            DataAccountUtils::write_account_data(agent_account, agent_info)?;
+            Ok(())
+        }
+    }
+
+    fn process_change_agent_setting_proposal(
+        program_id: &Pubkey,
+        agent_account: &AccountInfo,
+        agent_id: u128,
+        new_agent_settings: AgentSettings,
+    ) -> ProgramResult {
+        AgentManagerUtils::validate_agent_header(&new_agent_settings.agent_header)?;
+        DataAccountUtils::check_account_match(
+            program_id,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &agent_id.to_le_bytes(),
+        )?;
+
+        let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+        let settings = agent_info.agent_settings.clone();
+        let new_digest = AgentManagerUtils::setting_digest_from_settings_data(
+            *agent_account.key,
+            &new_agent_settings,
+        );
+        let digest =
+            AgentManagerUtils::setting_digest_from_settings_data(*agent_account.key, &settings);
+
+        if !agent_info.is_registered && !agent_info.is_allowed {
+            Err(AttpsAccountError::InvalidAllowedAgent.into())
+        } else if settings.agent_header.source_agent_id
+            != new_agent_settings.agent_header.source_agent_id
+        {
+            Err(AgentHeaderError::InvalidAgentHeaderAgentId.into())
+        } else if (agent_info.is_registered || agent_info.is_new_settings) && new_digest == digest {
+            Err(AttpsAccountError::InvalidAgentConfig.into())
+        } else {
+            agent_info.agent_settings = new_agent_settings;
+            agent_info.is_new_settings = true;
+            DataAccountUtils::write_account_data(agent_account, agent_info)
+        }
     }
 
     fn process_accept_agent_setting_proposal(
@@ -222,6 +335,16 @@ impl Processor {
         _agent_id: u128,
     ) -> ProgramResult {
         // TODO: Remove agent
+        Ok(())
+    }
+
+    fn process_verify(
+        _program_id: &Pubkey,
+        _accounts: &[AccountInfo],
+        _settings_digest: [u8; 32],
+        _payload: MessagePayload,
+    ) -> ProgramResult {
+        // TODO: Verify message payload
         Ok(())
     }
 }

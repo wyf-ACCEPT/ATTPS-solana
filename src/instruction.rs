@@ -44,20 +44,21 @@ impl CounterInstruction {
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum AgentInstruction {
-    /// Initialize the contract
+    /// [0] Initialize the contract
     ///
     /// 0. [signer] payer
-    /// 1. [writable] contract_info
+    /// 1. [] owner
+    /// 2. [writable] contract_info
     Initialize,
 
-    /// Create a new agent (create a new data account)
+    /// [1] Create a new agent (create a new data account)
     ///
     /// 0. [signer] payer
     /// 1. [writable] contract_info
     /// 2. [writable] agent data account
     CreateAgent,
 
-    /// Register an agent (write to agent data account)
+    /// [2] Register an agent (write to agent data account)
     ///
     /// 0. [writable] contract_info
     /// 1. [writable] agent data account
@@ -65,22 +66,30 @@ pub enum AgentInstruction {
         agent_settings: AgentSettings,
     },
 
+    /// [3] Create & register an agent ([1] + [2])
+    ///
+    /// 0. [signer] payer
+    /// 1. [writable] contract_info
+    /// 2. [writable] agent data account
     CreateAndRegisterAgent {
         agent_settings: AgentSettings,
     },
 
-    ChangeAgentSettingProposal {
-        agent_id: u128,
-        agent_settings: AgentSettings,
-    },
-
-    Verify {
-        settings_digest: [u8; 32],
-        payload: MessagePayload,
-    },
-
+    /// [4] Accept an agent
+    ///
+    /// 0. [signer] owner
+    /// 1. [writable] contract_info
+    /// 2. [writable] agent data account
     AcceptAgent {
         agent_id: u128,
+    },
+
+    /// [5] Change an agent setting proposal
+    ///
+    /// 0. [writable] agent data account
+    ChangeAgentSettingProposal {
+        agent_id: u128,
+        new_agent_settings: AgentSettings,
     },
 
     AcceptAgentSettingProposal {
@@ -89,6 +98,11 @@ pub enum AgentInstruction {
 
     RemoveAgent {
         agent_id: u128,
+    },
+
+    Verify {
+        settings_digest: [u8; 32],
+        payload: MessagePayload,
     },
 }
 
@@ -125,11 +139,11 @@ impl AgentInstruction {
                         .try_into()
                         .map_err(|_| ProgramError::InvalidInstructionData)?,
                 );
-                let agent_settings = AgentSettings::try_from_slice(&rest[16..])
+                let new_agent_settings = AgentSettings::try_from_slice(&rest[16..])
                     .map_err(|_| ProgramError::InvalidInstructionData)?;
                 Ok(Self::ChangeAgentSettingProposal {
                     agent_id,
-                    agent_settings,
+                    new_agent_settings,
                 })
             }
             5 => {

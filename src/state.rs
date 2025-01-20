@@ -1,5 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
+use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
+
+use crate::error::StateError;
 
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct CounterAccount {
@@ -128,17 +130,17 @@ pub struct AgentSettings {
 ///
 /// Fixed size components:
 /// - config_digest: 32 bytes ([u8; 32])
-/// - config_block_number: 4 bytes (u32)
+/// - config_block_number: 8 bytes (u64)
 /// - is_active: 1 byte (bool)
 ///
 /// Nested components:
 /// - settings: See AgentSettings struct size calculation
 ///
-/// Total size = 37 + settings_size
+/// Total size = 41 + settings_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentConfig {
     pub config_digest: [u8; 32],
-    pub config_block_number: u32,
+    pub config_block_number: u64,
     pub is_active: bool,
     pub settings: AgentSettings,
 }
@@ -169,13 +171,15 @@ pub struct AgentConfigState {
 /// # Size
 ///
 /// Components:
+/// - owner: 32 bytes (Pubkey)
 /// - agent_counter: 16 bytes (u128)
 /// - type_and_version: (4 + type_and_version.len()) bytes
 /// - agent_version: (4 + agent_version.len()) bytes
 ///
-/// Total size = 24 + (type_and_version.len() + agent_version.len())
+/// Total size = 56 + (type_and_version.len() + agent_version.len())
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub struct ContractInfo {
+    pub owner: Pubkey,
     pub agent_counter: u128,
     pub type_and_version: String,
     pub agent_version: String,
@@ -187,6 +191,7 @@ pub struct ContractInfo {
 ///
 /// Components:
 /// - agent_id: 16 bytes (u128)
+/// - is_registered: 1 byte (bool)
 /// - is_allowed: 1 byte (bool)
 /// - is_removed: 1 byte (bool)
 /// - is_new_settings: 1 byte (bool)
@@ -197,9 +202,20 @@ pub struct ContractInfo {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentInfo {
     pub agent_id: u128, // Unique auto-incrementing identifier
+    pub is_registered: bool,
     pub is_allowed: bool,
     pub is_removed: bool,
     pub is_new_settings: bool,
     pub agent_settings: AgentSettings,
     pub agent_config: AgentConfig,
+}
+
+impl ContractInfo {
+    pub fn only_owner(&self, signer: &Pubkey) -> ProgramResult {
+        if self.owner != *signer {
+            Err(StateError::InvalidOwner.into())
+        } else {
+            Ok(())
+        }
+    }
 }

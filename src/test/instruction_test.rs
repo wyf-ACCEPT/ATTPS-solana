@@ -11,6 +11,8 @@ use solana_sdk::{
 
 #[cfg(test)]
 mod instruction_test {
+    use solana_sdk::signature::Keypair;
+
     use crate::state::ContractInfo;
 
     use super::*;
@@ -18,7 +20,10 @@ mod instruction_test {
     #[tokio::test]
     async fn test_initialize_create_register() {
         use crate::processor::Processor;
+
         let program_id = Pubkey::new_unique();
+        let owner_account = Keypair::new();
+
         let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
             "attps_solana",
             program_id,
@@ -39,6 +44,7 @@ mod instruction_test {
             &[0], // 0 = Initialize instruction
             vec![
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(owner_account.pubkey(), false),
                 AccountMeta::new(contract_info_pubkey, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
@@ -153,9 +159,10 @@ mod instruction_test {
             match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
                 Ok(agent) => {
                     assert_eq!(agent.agent_id, 0);
+                    assert_eq!(agent.is_registered, true);
                     assert_eq!(agent.is_allowed, false);
                     assert_eq!(agent.is_removed, false);
-                    assert_eq!(agent.is_new_settings, false);
+                    assert_eq!(agent.is_new_settings, true);
                     println!(
                         "✅ Agent registered successfully with ID: {}",
                         agent.agent_id
@@ -185,5 +192,33 @@ mod instruction_test {
             assert_eq!(info.agent_counter, 1);
             println!("✅ Agent counter incremented successfully");
         }
+
+        // Create & register agent in one transaction
+        let mut create_and_register_instruction_data = vec![3]; // 3 = CreateAndRegisterAgent instruction
+        let agent_id_bytes_1 = 1u128.to_le_bytes();
+        let (agent_pubkey_1, _) = Pubkey::find_program_address(
+            &[Constants::PREFIX_AGENT_ADDRESS, &agent_id_bytes_1],
+            &program_id,
+        );
+        agent_settings
+            .serialize(&mut create_and_register_instruction_data)
+            .unwrap();
+
+        let create_and_register_instruction = Instruction::new_with_bytes(
+            program_id,
+            &create_and_register_instruction_data,
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey_1, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[create_and_register_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
     }
 }

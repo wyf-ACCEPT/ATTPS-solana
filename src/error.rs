@@ -21,6 +21,12 @@ pub enum AttpsAccountError {
     PdaAccountMismatch = 201,
     PdaAccountNotWritable,
     PdaAccountAlreadyCreated,
+    AgentAlreadyRegistered,
+    AgentAlreadyAllowed,
+    AgentAlreadyRemoved,
+    AgentNotRegistered,
+    InvalidAllowedAgent,
+    InvalidAgentConfig,
 }
 
 impl From<AttpsAccountError> for ProgramError {
@@ -38,6 +44,17 @@ pub enum AgentHeaderError {
 
 impl From<AgentHeaderError> for ProgramError {
     fn from(e: AgentHeaderError) -> Self {
+        ProgramError::Custom(e as u32)
+    }
+}
+
+#[derive(Debug)]
+pub enum StateError {
+    InvalidOwner = 401,
+}
+
+impl From<StateError> for ProgramError {
+    fn from(e: StateError) -> Self {
         ProgramError::Custom(e as u32)
     }
 }
