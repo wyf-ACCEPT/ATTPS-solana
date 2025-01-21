@@ -8,7 +8,7 @@ pub struct CounterAccount {
     pub count: u64,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default, PartialEq)]
 pub enum MessageType {
     #[default]
     Event,
@@ -16,7 +16,7 @@ pub enum MessageType {
     Response,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default, PartialEq)]
 pub enum Priority {
     #[default]
     Low,
@@ -35,7 +35,7 @@ pub enum Priority {
 /// - Each string field adds (4 + content length) bytes
 /// - Fixed fields add (8 + 1 + 1 + 8 = 18) bytes (timestamps, enums, etc)
 ///
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default, PartialEq)]
 pub struct AgentHeader {
     pub version: String,
     pub message_id: String,
@@ -116,7 +116,7 @@ pub struct MessagePayload {
 /// - agent_header: See AgentHeader struct size calculation
 ///
 /// Total size = 37 + (20*signers.len()) + agent_header_size
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default, PartialEq)]
 pub struct AgentSettings {
     pub signers: Vec<[u8; 20]>,
     pub threshold: u8,

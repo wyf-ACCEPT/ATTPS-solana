@@ -13,7 +13,11 @@ use solana_sdk::{
 mod instruction_test {
     use solana_sdk::{signature::Keypair, transaction::TransactionError};
 
-    use crate::{error::AgentHeaderError, state::ContractInfo};
+    use crate::{
+        error::{AgentHeaderError, StateError},
+        state::{AgentInfo, ContractInfo},
+        utils::AgentManagerUtils,
+    };
 
     use super::*;
 
@@ -353,7 +357,7 @@ mod instruction_test {
     }
 
     #[tokio::test]
-    async fn test_change_agent_setting_proposal() {
+    async fn test_change_accept_agent_setting() {
         use crate::processor::Processor;
 
         let program_id = Pubkey::new_unique();
@@ -436,7 +440,30 @@ mod instruction_test {
         transaction.sign(&[&payer], recent_blockhash);
         banks_client.process_transaction(transaction).await.unwrap();
 
-        // Step 3: Change agent settings
+        // Step 3: Accept the agent
+        println!("Testing agent acceptance...");
+        let accept_instruction_data = {
+            let mut data = vec![6]; // AcceptAgent instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            data
+        };
+
+        let accept_instruction = Instruction::new_with_bytes(
+            program_id,
+            &accept_instruction_data,
+            vec![
+                AccountMeta::new(owner_account.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[accept_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer, &owner_account], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Step 4: Change agent settings
         println!("Testing agent settings change proposal...");
 
         // Create new settings with different threshold and signers
@@ -473,13 +500,18 @@ mod instruction_test {
             match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
                 Ok(agent) => {
                     assert_eq!(agent.agent_id, 0);
-                    assert_eq!(agent.pending_settings.as_ref().unwrap().threshold, 3);
-                    assert_eq!(agent.pending_settings.as_ref().unwrap().signers.len(), 3);
+                    assert_eq!(agent.is_registered, false);
+                    assert_eq!(agent.is_allowed, true);
+                    assert_eq!(agent.is_removed, false);
+                    assert!(agent.pending_settings.is_some());
+
+                    // Verify pending settings are updated with new values
+                    let pending = agent.pending_settings.as_ref().unwrap();
+                    assert_eq!(pending.threshold, 3);
+                    assert_eq!(pending.signers.len(), 3);
+
                     println!("✅ Agent settings change proposed successfully");
-                    println!(
-                        "✅ New agent settings: {:?}",
-                        agent.pending_settings.as_ref()
-                    );
+                    println!("✅ Pending settings: {:?}", pending);
                 }
                 Err(e) => {
                     println!("❌ Failed to deserialize agent data: {:?}", e);
@@ -518,5 +550,80 @@ mod instruction_test {
             assert_eq!(err, AgentHeaderError::InvalidAgentHeaderAgentId.into());
         }
         println!("✅ Invalid settings change rejected as expected");
+
+        // Test accepting settings proposal
+        println!("Testing settings proposal acceptance...");
+        let accept_settings_instruction_data = {
+            let mut data = vec![7]; // AcceptAgentSettingProposal instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            data
+        };
+
+        let accept_settings_instruction = Instruction::new_with_bytes(
+            program_id,
+            &accept_settings_instruction_data,
+            vec![
+                AccountMeta::new(owner_account.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+            ],
+        );
+
+        let mut transaction = Transaction::new_with_payer(
+            &[accept_settings_instruction.clone()],
+            Some(&payer.pubkey()),
+        );
+        transaction.sign(&[&payer, &owner_account], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Test error case: Try to accept settings with non-signer owner
+        println!("Testing non-signer owner rejection...");
+        let non_signer_instruction = Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new_readonly(owner_account.pubkey(), false), // Not a signer, not writable
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+            ],
+            data: accept_settings_instruction_data,
+        };
+        let mut transaction =
+            Transaction::new_with_payer(&[non_signer_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        if let TransactionError::InstructionError(_, err) = banks_client
+            .process_transaction(transaction)
+            .await
+            .unwrap_err()
+            .unwrap()
+        {
+            assert_eq!(err, StateError::OwnerAccountNotSigner.into());
+        }
+        println!("✅ Non-signer owner rejection verified");
+
+        // Verify final state
+        let account = banks_client
+            .get_account(agent_pubkey)
+            .await
+            .expect("Failed to get agent account");
+
+        if let Some(account_data) = account {
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
+                Ok(agent) => {
+                    assert_eq!(agent.agent_id, 0);
+                    assert_eq!(agent.is_allowed, true);
+                    assert_eq!(agent.is_removed, false);
+                    assert!(agent.pending_settings.is_none());
+                    assert_eq!(agent.agent_settings.threshold, 3);
+                    assert_eq!(agent.agent_settings.signers.len(), 3);
+                    println!("✅ Settings proposal accepted successfully");
+                    println!("✅ Final agent state: {:?}", agent);
+                }
+                Err(e) => {
+                    println!("❌ Failed to deserialize agent data: {:?}", e);
+                    panic!("Failed to deserialize agent data: {:?}", e);
+                }
+            }
+        }
     }
 }

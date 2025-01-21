@@ -1,5 +1,4 @@
-use solana_program::instruction::InstructionError;
-use solana_program::program_error::ProgramError;
+use solana_program::{instruction::InstructionError, program_error::ProgramError};
 
 #[derive(Debug)]
 pub enum VerificationError {
@@ -65,5 +64,11 @@ pub enum StateError {
 impl From<StateError> for ProgramError {
     fn from(e: StateError) -> Self {
         ProgramError::Custom(e as u32)
+    }
+}
+
+impl From<StateError> for InstructionError {
+    fn from(e: StateError) -> Self {
+        InstructionError::Custom(e as u32)
     }
 }
