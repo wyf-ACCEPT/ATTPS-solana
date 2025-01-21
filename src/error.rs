@@ -59,6 +59,7 @@ impl From<AgentHeaderError> for InstructionError {
 #[derive(Debug)]
 pub enum StateError {
     InvalidOwner = 401,
+    OwnerAccountNotSigner,
 }
 
 impl From<StateError> for ProgramError {

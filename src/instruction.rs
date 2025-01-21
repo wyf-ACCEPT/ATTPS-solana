@@ -50,9 +50,14 @@ pub enum AgentInstruction {
     /// 0. [writable] agent data account
     ChangeAgentSettingProposal {
         agent_id: u128,
-        new_agent_settings: AgentSettings,
+        proposed_settings: AgentSettings,
     },
 
+    /// [6] Accept an agent setting proposal
+    ///
+    /// 0. [signer] owner
+    /// 1. [writable] contract_info
+    /// 2. [writable] agent data account
     AcceptAgentSettingProposal {
         agent_id: u128,
     },
@@ -100,11 +105,11 @@ impl AgentInstruction {
                         .try_into()
                         .map_err(|_| ProgramError::InvalidInstructionData)?,
                 );
-                let new_agent_settings = AgentSettings::try_from_slice(&rest[16..])
+                let proposed_settings = AgentSettings::try_from_slice(&rest[16..])
                     .map_err(|_| ProgramError::InvalidInstructionData)?;
                 Ok(Self::ChangeAgentSettingProposal {
                     agent_id,
-                    new_agent_settings,
+                    proposed_settings,
                 })
             }
             5 => {

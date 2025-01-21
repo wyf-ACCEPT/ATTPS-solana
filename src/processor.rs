@@ -82,18 +82,27 @@ impl Processor {
             }
             AgentInstruction::ChangeAgentSettingProposal {
                 agent_id,
-                new_agent_settings,
+                proposed_settings,
             } => {
                 let agent_account = next_account_info(accounts_iter)?;
                 Self::process_change_agent_setting_proposal(
                     program_id,
                     agent_account,
                     agent_id,
-                    new_agent_settings,
+                    proposed_settings,
                 )
             }
             AgentInstruction::AcceptAgentSettingProposal { agent_id } => {
-                Self::process_accept_agent_setting_proposal(program_id, accounts, agent_id)
+                let owner_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_accept_agent_setting_proposal(
+                    program_id,
+                    owner_account,
+                    contract_info_account,
+                    agent_account,
+                    agent_id,
+                )
             }
             AgentInstruction::RemoveAgent { agent_id } => {
                 Self::process_remove_agent(program_id, accounts, agent_id)
@@ -242,7 +251,7 @@ impl Processor {
 
         let contract_info: ContractInfo =
             DataAccountUtils::read_account_data(contract_info_account)?;
-        contract_info.only_owner(owner_account.key)?;
+        contract_info.only_owner(owner_account)?;
 
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
         if !agent_info.is_registered {
@@ -299,14 +308,6 @@ impl Processor {
         } else if settings.agent_header.source_agent_id
             != proposed_settings.agent_header.source_agent_id
         {
-            msg!(
-                "settings.agent_header.source_agent_id: {:?}",
-                settings.agent_header.source_agent_id
-            );
-            msg!(
-                "proposed_settings.agent_header.source_agent_id: {:?}",
-                proposed_settings.agent_header.source_agent_id
-            );
             Err(AgentHeaderError::InvalidAgentHeaderAgentId.into())
         } else if digest == proposed_settings_digest {
             Err(AttpsAccountError::DuplicateAgentSettings.into())
@@ -318,12 +319,48 @@ impl Processor {
     }
 
     fn process_accept_agent_setting_proposal(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_id: u128,
+        program_id: &Pubkey,
+        owner_account: &AccountInfo,
+        contract_info_account: &AccountInfo,
+        agent_account: &AccountInfo,
+        agent_id: u128,
     ) -> ProgramResult {
-        // TODO: Accept agent setting change proposal
-        Ok(())
+        DataAccountUtils::check_account_match(
+            program_id,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
+        )?;
+        DataAccountUtils::check_account_match(
+            program_id,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &agent_id.to_le_bytes(),
+        )?;
+
+        let contract_info: ContractInfo =
+            DataAccountUtils::read_account_data(contract_info_account)?;
+        contract_info.only_owner(owner_account)?;
+
+        let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+
+        if !agent_info.is_allowed || agent_info.is_removed {
+            Err(AttpsAccountError::InvalidAllowedAgent.into())
+        } else {
+            let proposed_settings = agent_info.pending_settings.take().unwrap();
+            agent_info.agent_settings = proposed_settings.clone();
+            agent_info.agent_config = AgentConfig {
+                config_digest: AgentManagerUtils::setting_digest_from_settings_data(
+                    *agent_account.key,
+                    &proposed_settings,
+                ),
+                config_block_number: Clock::get()?.slot,
+                is_active: true,
+                settings: proposed_settings,
+            };
+            agent_info.print_values();
+            DataAccountUtils::write_account_data(agent_account, agent_info)
+        }
     }
 
     fn process_remove_agent(

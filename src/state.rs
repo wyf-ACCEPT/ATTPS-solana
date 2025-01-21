@@ -1,5 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{entrypoint::ProgramResult, msg, pubkey::Pubkey};
+use solana_program::{entrypoint::ProgramResult, msg, pubkey::Pubkey, account_info::AccountInfo};
 
 use crate::error::StateError;
 
@@ -204,9 +204,11 @@ impl AgentInfo {
 }
 
 impl ContractInfo {
-    pub fn only_owner(&self, signer: &Pubkey) -> ProgramResult {
-        if self.owner != *signer {
+    pub fn only_owner(&self, owner_account: &AccountInfo) -> ProgramResult {
+        if *owner_account.key != self.owner {
             Err(StateError::InvalidOwner.into())
+        } else if !owner_account.is_signer {
+            Err(StateError::OwnerAccountNotSigner.into())
         } else {
             Ok(())
         }
