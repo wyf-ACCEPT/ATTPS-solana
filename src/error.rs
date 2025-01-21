@@ -1,4 +1,5 @@
 use solana_program::program_error::ProgramError;
+use solana_program::instruction::InstructionError;
 
 #[derive(Debug)]
 pub enum VerificationError {
@@ -45,6 +46,12 @@ pub enum AgentHeaderError {
 impl From<AgentHeaderError> for ProgramError {
     fn from(e: AgentHeaderError) -> Self {
         ProgramError::Custom(e as u32)
+    }
+}
+
+impl From<AgentHeaderError> for InstructionError {
+    fn from(e: AgentHeaderError) -> Self {
+        InstructionError::Custom(e as u32)
     }
 }
 

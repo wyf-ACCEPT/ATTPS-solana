@@ -11,9 +11,9 @@ use solana_sdk::{
 
 #[cfg(test)]
 mod instruction_test {
-    use solana_sdk::signature::Keypair;
+    use solana_sdk::{signature::Keypair, transaction::TransactionError};
 
-    use crate::state::ContractInfo;
+    use crate::{error::AgentHeaderError, state::ContractInfo};
 
     use super::*;
 
@@ -219,6 +219,304 @@ mod instruction_test {
             Transaction::new_with_payer(&[create_and_register_instruction], Some(&payer.pubkey()));
         transaction.sign(&[&payer], recent_blockhash);
         banks_client.process_transaction(transaction).await.unwrap();
+    }
 
+    #[tokio::test]
+    async fn test_accept_agent() {
+        use crate::processor::Processor;
+
+        let program_id = Pubkey::new_unique();
+        let owner_account = Keypair::new();
+
+        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
+            "attps_solana",
+            program_id,
+            processor!(Processor::process_instruction),
+        )
+        .start()
+        .await;
+
+        // Get contract info PDA
+        let (contract_info_pubkey, _) =
+            Pubkey::find_program_address(&[Constants::PREFIX_CONTRACT_INFO, b""], &program_id);
+
+        // Step 1: Initialize the program
+        println!("Testing program initialization...");
+        let initialize_instruction = Instruction::new_with_bytes(
+            program_id,
+            &[0], // Initialize instruction
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(owner_account.pubkey(), false),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[initialize_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Step 2: Create and register an agent
+        println!("Testing agent creation and registration...");
+        let agent_id_bytes = 0u128.to_le_bytes();
+        let (agent_pubkey, _) = Pubkey::find_program_address(
+            &[Constants::PREFIX_AGENT_ADDRESS, &agent_id_bytes],
+            &program_id,
+        );
+
+        // Create sample agent settings
+        let agent_settings = AgentSettings {
+            signers: vec![[1u8; 20], [2u8; 20]],
+            threshold: 2,
+            converter_address: Pubkey::new_unique(),
+            agent_header: AgentHeader {
+                version: "1.0".to_string(),
+                message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
+                source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
+                source_agent_name: "Test Agent".to_string(),
+                target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
+                timestamp: 1234567890,
+                message_type: MessageType::Request,
+                priority: Priority::High,
+                ttl: 3600,
+            },
+        };
+
+        let mut create_and_register_instruction_data = vec![3]; // CreateAndRegisterAgent
+        agent_settings
+            .serialize(&mut create_and_register_instruction_data)
+            .unwrap();
+
+        let create_and_register_instruction = Instruction::new_with_bytes(
+            program_id,
+            &create_and_register_instruction_data,
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[create_and_register_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Step 3: Accept the agent
+        println!("Testing agent acceptance...");
+        let accept_instruction_data = {
+            let mut data = vec![6]; // AcceptAgent instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            data
+        };
+
+        let accept_instruction = Instruction::new_with_bytes(
+            program_id,
+            &accept_instruction_data,
+            vec![
+                AccountMeta::new(owner_account.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[accept_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer, &owner_account], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Verify agent state after acceptance
+        let account = banks_client
+            .get_account(agent_pubkey)
+            .await
+            .expect("Failed to get agent account");
+
+        if let Some(account_data) = account {
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
+                Ok(agent) => {
+                    assert_eq!(agent.agent_id, 0);
+                    assert_eq!(agent.is_registered, false);
+                    assert_eq!(agent.is_allowed, true);
+                    assert_eq!(agent.is_removed, false);
+                    assert_eq!(agent.is_new_settings, false);
+                    println!("✅ Agent accepted successfully");
+                    println!("✅ Agent config: {:?}", agent.agent_config);
+                }
+                Err(e) => {
+                    println!("❌ Failed to deserialize agent data: {:?}", e);
+                    panic!("Failed to deserialize agent data: {:?}", e);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_change_agent_setting_proposal() {
+        use crate::processor::Processor;
+
+        let program_id = Pubkey::new_unique();
+        let owner_account = Keypair::new();
+
+        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
+            "attps_solana",
+            program_id,
+            processor!(Processor::process_instruction),
+        )
+        .start()
+        .await;
+
+        // Get contract info PDA
+        let (contract_info_pubkey, _) =
+            Pubkey::find_program_address(&[Constants::PREFIX_CONTRACT_INFO, b""], &program_id);
+
+        // Step 1: Initialize the program
+        println!("Testing program initialization...");
+        let initialize_instruction = Instruction::new_with_bytes(
+            program_id,
+            &[0], // Initialize instruction
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(owner_account.pubkey(), false),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[initialize_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Step 2: Create and register an agent
+        println!("Testing agent creation and registration...");
+        let agent_id_bytes = 0u128.to_le_bytes();
+        let (agent_pubkey, _) = Pubkey::find_program_address(
+            &[Constants::PREFIX_AGENT_ADDRESS, &agent_id_bytes],
+            &program_id,
+        );
+
+        // Create initial agent settings
+        let initial_settings = AgentSettings {
+            signers: vec![[1u8; 20], [2u8; 20]],
+            threshold: 2,
+            converter_address: Pubkey::new_unique(),
+            agent_header: AgentHeader {
+                version: "1.0".to_string(),
+                message_id: "123e4567-e89b-4d3c-a456-426614174000".to_string(),
+                source_agent_id: "987fcdeb-51a2-4bc3-9876-543210987654".to_string(),
+                source_agent_name: "Test Agent".to_string(),
+                target_agent_id: "555e4567-e89b-4d3c-a456-426614174000".to_string(),
+                timestamp: 1234567890,
+                message_type: MessageType::Request,
+                priority: Priority::High,
+                ttl: 3600,
+            },
+        };
+
+        let mut create_and_register_instruction_data = vec![3]; // CreateAndRegisterAgent
+        initial_settings
+            .serialize(&mut create_and_register_instruction_data)
+            .unwrap();
+
+        let create_and_register_instruction = Instruction::new_with_bytes(
+            program_id,
+            &create_and_register_instruction_data,
+            vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[create_and_register_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Step 3: Change agent settings
+        println!("Testing agent settings change proposal...");
+
+        // Create new settings with different threshold and signers
+        let mut new_settings = initial_settings.clone();
+        new_settings.threshold = 3;
+        new_settings.signers.push([3u8; 20]);
+
+        let change_settings_instruction_data = {
+            let mut data = vec![4]; // ChangeAgentSettingProposal instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            new_settings.serialize(&mut data).unwrap();
+            data
+        };
+
+        let change_settings_instruction = Instruction::new_with_bytes(
+            program_id,
+            &change_settings_instruction_data,
+            vec![AccountMeta::new(agent_pubkey, false)],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[change_settings_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        // Verify agent state after settings change
+        let account = banks_client
+            .get_account(agent_pubkey)
+            .await
+            .expect("Failed to get agent account");
+
+        if let Some(account_data) = account {
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
+                Ok(agent) => {
+                    assert_eq!(agent.agent_id, 0);
+                    assert_eq!(agent.is_new_settings, true);
+                    assert_eq!(agent.agent_settings.threshold, 3);
+                    assert_eq!(agent.agent_settings.signers.len(), 3);
+                    println!("✅ Agent settings changed successfully");
+                    println!("✅ New agent settings: {:?}", agent.agent_settings);
+                }
+                Err(e) => {
+                    println!("❌ Failed to deserialize agent data: {:?}", e);
+                    panic!("Failed to deserialize agent data: {:?}", e);
+                }
+            }
+        }
+
+        // Test error case: Try to change settings with same source_agent_id but different agent_id
+        println!("Testing invalid settings change...");
+        let mut invalid_settings = new_settings.clone();
+        invalid_settings.agent_header.source_agent_id = "different-agent-id".to_string();
+
+        let invalid_change_instruction_data = {
+            let mut data = vec![4]; // ChangeAgentSettingProposal instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            invalid_settings.serialize(&mut data).unwrap();
+            data
+        };
+
+        let invalid_change_instruction = Instruction::new_with_bytes(
+            program_id,
+            &invalid_change_instruction_data,
+            vec![AccountMeta::new(agent_pubkey, false)],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[invalid_change_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+        if let TransactionError::InstructionError(_, err) = banks_client
+            .process_transaction(transaction)
+            .await
+            .unwrap_err()
+            .unwrap()
+        {
+            assert_eq!(err, AgentHeaderError::InvalidAgentHeaderAgentId.into());
+        }
+        println!("✅ Invalid settings change rejected as expected");
     }
 }
