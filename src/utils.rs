@@ -34,7 +34,7 @@ impl DataAccountUtils {
         } else if !map_account.data_is_empty() {
             Err(AttpsAccountError::PdaAccountAlreadyCreated.into())
         } else {
-            println!("rent get: {:?}", Rent::get());
+            println!("\trent get: {:?}", Rent::get());
             let rent = Rent::get()?;
             let rent_lamports = rent.minimum_balance(data_length);
             invoke_signed(

@@ -105,12 +105,31 @@ impl Processor {
                 )
             }
             AgentInstruction::RemoveAgent { agent_id } => {
-                Self::process_remove_agent(program_id, accounts, agent_id)
+                let owner_account = next_account_info(accounts_iter)?;
+                let contract_info_account = next_account_info(accounts_iter)?;
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_remove_agent(
+                    program_id,
+                    owner_account,
+                    contract_info_account,
+                    agent_account,
+                    agent_id,
+                )
             }
             AgentInstruction::Verify {
+                agent_id,
                 settings_digest,
                 payload,
-            } => Self::process_verify(program_id, accounts, settings_digest, payload),
+            } => {
+                let agent_account = next_account_info(accounts_iter)?;
+                Self::process_verify(
+                    program_id,
+                    agent_account,
+                    agent_id,
+                    settings_digest,
+                    payload,
+                )
+            }
         }
     }
 
@@ -131,6 +150,7 @@ impl Processor {
         )?;
 
         // Initialize counter with starting ID of 0
+        msg!("Contract info data account initialized");
         DataAccountUtils::write_account_data(
             contract_info_account,
             ContractInfo {
@@ -139,10 +159,7 @@ impl Processor {
                 type_and_version: "AI Agent 1.0.0".to_string(),
                 agent_version: "AI Agent 1.0.0".to_string(),
             },
-        )?;
-
-        msg!("Contract info data account initialized");
-        Ok(())
+        )
     }
 
     fn process_create_agent<'a>(
@@ -174,9 +191,7 @@ impl Processor {
         DataAccountUtils::write_account_data(agent_account, agent_info)?;
 
         contract_info.agent_counter += 1;
-        DataAccountUtils::write_account_data(contract_info_account, contract_info)?;
-
-        Ok(())
+        DataAccountUtils::write_account_data(contract_info_account, contract_info)
     }
 
     fn process_register_agent(
@@ -203,7 +218,6 @@ impl Processor {
         } else {
             agent_info.is_registered = true;
             agent_info.agent_settings = initial_settings;
-            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }
@@ -274,10 +288,7 @@ impl Processor {
                 is_active: true,
                 settings,
             };
-
-            agent_info.print_values();
-            DataAccountUtils::write_account_data(agent_account, agent_info)?;
-            Ok(())
+            DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }
 
@@ -313,7 +324,6 @@ impl Processor {
             Err(AttpsAccountError::DuplicateAgentSettings.into())
         } else {
             let _old_pending_settings = agent_info.pending_settings.replace(proposed_settings);
-            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }
@@ -358,25 +368,48 @@ impl Processor {
                 is_active: true,
                 settings: proposed_settings,
             };
-            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }
 
     fn process_remove_agent(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _agent_id: u128,
+        program_id: &Pubkey,
+        owner_account: &AccountInfo,
+        contract_info_account: &AccountInfo,
+        agent_account: &AccountInfo,
+        agent_id: u128,
     ) -> ProgramResult {
-        // TODO: Remove agent
-        Ok(())
+        DataAccountUtils::check_account_match(
+            program_id,
+            contract_info_account,
+            Constants::PREFIX_CONTRACT_INFO,
+            b"",
+        )?;
+        DataAccountUtils::check_account_match(
+            program_id,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &agent_id.to_le_bytes(),
+        )?;
+
+        let contract_info: ContractInfo =
+            DataAccountUtils::read_account_data(contract_info_account)?;
+        contract_info.only_owner(owner_account)?;
+
+        let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+        agent_info.is_registered = false;
+        agent_info.is_allowed = false;
+        agent_info.is_removed = true;
+        agent_info.print_values();
+        DataAccountUtils::write_account_data(agent_account, agent_info)
     }
 
     fn process_verify(
-        _program_id: &Pubkey,
-        _accounts: &[AccountInfo],
-        _settings_digest: [u8; 32],
-        _payload: MessagePayload,
+        program_id: &Pubkey,
+        agent_account: &AccountInfo,
+        agent_id: u128,
+        settings_digest: [u8; 32],
+        payload: MessagePayload,
     ) -> ProgramResult {
         // TODO: Verify message payload
         Ok(())

@@ -192,14 +192,13 @@ pub struct AgentInfo {
 
 impl AgentInfo {
     pub fn print_values(&self) {
-        msg!("Writing agent info:");
-        msg!(" - agent_id: {}", self.agent_id);
-        msg!(" - is_registered: {}", self.is_registered);
-        msg!(" - is_allowed: {}", self.is_allowed);
-        msg!(" - is_removed: {}", self.is_removed);
-        msg!(" - agent_settings: {:?}", self.agent_settings);
-        msg!(" - pending_settings: {:?}", self.pending_settings);
-        msg!(" - agent_config: {:?}", self.agent_config);
+        println!(" - agent_id: {}", self.agent_id);
+        println!(" - is_registered: {}", self.is_registered);
+        println!(" - is_allowed: {}", self.is_allowed);
+        println!(" - is_removed: {}", self.is_removed);
+        println!(" - agent_settings: {:?}", self.agent_settings);
+        println!(" - pending_settings: {:?}", self.pending_settings);
+        println!(" - agent_config: {:?}", self.agent_config);
     }
 }
 
