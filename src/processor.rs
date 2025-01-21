@@ -1,17 +1,13 @@
 use crate::constants::Constants;
 use crate::error::{AgentHeaderError, AttpsAccountError};
-use crate::instruction::{AgentInstruction, CounterInstruction};
-use crate::state::{
-    AgentConfig, AgentInfo, AgentSettings, ContractInfo, CounterAccount, MessagePayload,
-};
+use crate::instruction::AgentInstruction;
+use crate::state::{AgentConfig, AgentInfo, AgentSettings, ContractInfo, MessagePayload};
 use crate::utils::{AgentManagerUtils, DataAccountUtils};
-use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     clock::Clock,
     entrypoint::ProgramResult,
     msg,
-    program_error::ProgramError,
     pubkey::Pubkey,
     sysvar::Sysvar,
 };
@@ -152,7 +148,8 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        let mut contract_info: ContractInfo = DataAccountUtils::read_account_data(contract_info_account)?;
+        let mut contract_info: ContractInfo =
+            DataAccountUtils::read_account_data(contract_info_account)?;
 
         let mut agent_info = AgentInfo::default();
         agent_info.agent_id = contract_info.agent_counter;
@@ -257,7 +254,7 @@ impl Processor {
         } else {
             agent_info.is_registered = false;
             agent_info.is_allowed = true;
-            
+
             let settings = agent_info.agent_settings.clone();
             agent_info.agent_config = AgentConfig {
                 config_digest: AgentManagerUtils::setting_digest_from_settings_data(
@@ -302,8 +299,14 @@ impl Processor {
         } else if settings.agent_header.source_agent_id
             != proposed_settings.agent_header.source_agent_id
         {
-            msg!("settings.agent_header.source_agent_id: {:?}", settings.agent_header.source_agent_id);
-            msg!("proposed_settings.agent_header.source_agent_id: {:?}", proposed_settings.agent_header.source_agent_id);
+            msg!(
+                "settings.agent_header.source_agent_id: {:?}",
+                settings.agent_header.source_agent_id
+            );
+            msg!(
+                "proposed_settings.agent_header.source_agent_id: {:?}",
+                proposed_settings.agent_header.source_agent_id
+            );
             Err(AgentHeaderError::InvalidAgentHeaderAgentId.into())
         } else if digest == proposed_settings_digest {
             Err(AttpsAccountError::DuplicateAgentSettings.into())
@@ -339,125 +342,6 @@ impl Processor {
         _payload: MessagePayload,
     ) -> ProgramResult {
         // TODO: Verify message payload
-        Ok(())
-    }
-}
-
-pub struct CounterProcessor;
-
-impl CounterProcessor {
-    /// This function is only for reference. Will be removed in the future.
-    #[deprecated]
-    pub fn process_instruction_counter(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        instruction_data: &[u8],
-    ) -> ProgramResult {
-        // Unpack instruction data
-        let instruction = CounterInstruction::unpack(instruction_data)?;
-
-        // Match instruction type
-        match instruction {
-            CounterInstruction::InitializeCounter { initial_value } => {
-                Self::process_initialize_counter(program_id, accounts, initial_value)?
-            }
-            CounterInstruction::IncrementCounter => {
-                Self::process_increment_counter(program_id, accounts)?
-            }
-            CounterInstruction::AddAnyValue { amount } => {
-                Self::process_add_any_value(program_id, accounts, amount)?
-            }
-        };
-        Ok(())
-    }
-
-    // Initialize a new counter account
-    fn process_initialize_counter(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        initial_value: u64,
-    ) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-
-        let contract_info_account = next_account_info(accounts_iter)?;
-        let payer_account = next_account_info(accounts_iter)?;
-
-        // Create a new data account for the counter
-        DataAccountUtils::create_related_account(
-            program_id,
-            payer_account,
-            contract_info_account,
-            b"counter",
-            b"-1",
-            8, // data size
-        )?;
-
-        // Write the initial value to the counter account
-        DataAccountUtils::write_account_data(
-            contract_info_account,
-            CounterAccount {
-                count: initial_value,
-            },
-        )?;
-
-        msg!("Counter initialized with value: {}", initial_value);
-        Ok(())
-    }
-
-    // Update an existing counter's value
-    fn process_increment_counter(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-        let contract_info_account = next_account_info(accounts_iter)?;
-
-        // Verify account ownership
-        if contract_info_account.owner != program_id {
-            return Err(ProgramError::IncorrectProgramId);
-        }
-
-        // Read the counter data
-        let mut counter_data: CounterAccount =
-            DataAccountUtils::read_account_data(contract_info_account)?;
-
-        // Increment the counter value and write back
-        counter_data.count = counter_data
-            .count
-            .checked_add(1)
-            .ok_or(ProgramError::InvalidAccountData)?;
-        msg!("Counter incremented to: {}", counter_data.count);
-        DataAccountUtils::write_account_data(contract_info_account, counter_data)?;
-
-        Ok(())
-    }
-
-    fn process_add_any_value(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        amount: u64,
-    ) -> ProgramResult {
-        let accounts_iter = &mut accounts.iter();
-        let contract_info_account = next_account_info(accounts_iter)?;
-
-        // Verify account ownership
-        if contract_info_account.owner != program_id {
-            return Err(ProgramError::IncorrectProgramId);
-        }
-
-        // Mutable borrow the account data
-        let mut data = contract_info_account.data.borrow_mut();
-
-        // Deserialize the account data into our CounterAccount struct
-        let mut counter_data: CounterAccount = CounterAccount::try_from_slice(&data)?;
-
-        // Add the specified amount to the counter value
-        counter_data.count = counter_data
-            .count
-            .checked_add(amount)
-            .ok_or(ProgramError::InvalidAccountData)?;
-
-        // Serialize the updated counter data back into the account
-        counter_data.serialize(&mut &mut data[..])?;
-
-        msg!("Counter increased by {} to {}", amount, counter_data.count);
         Ok(())
     }
 }
