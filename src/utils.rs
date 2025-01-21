@@ -290,19 +290,17 @@ impl AgentManagerUtils {
         hash
     }
 
-    /// Validates a message type enum value
-    pub fn is_valid_message_type(message_type: &MessageType) -> bool {
-        matches!(
-            message_type,
-            MessageType::Request | MessageType::Response | MessageType::Event
-        )
-    }
+    /// Validates a message type enum value (no need in rust)
+    fn _is_valid_message_type(_message_type: &MessageType) {}
 
-    /// Validates a priority enum value
-    pub fn is_valid_priority(priority: &Priority) -> bool {
-        matches!(priority, Priority::High | Priority::Medium | Priority::Low)
-    }
+    /// Validates a priority enum value (no need in rust)
+    fn _is_valid_priority(_priority: &Priority) {}
 
-    // _isAgentConfigExists: TODO
-    // _getAgentConfigByDigest: TODO
+    /// Check if an agent config exists in the agent config state
+    /// We don't use AgentConfigState.
+    fn _is_agent_config_exists(_digest: &[u8; 32]) {}
+
+    /// Get an agent config by its digest
+    /// We don't use AgentConfigState.
+    fn _get_agent_config_by_digest(_digest: &[u8; 32]) {}
 }

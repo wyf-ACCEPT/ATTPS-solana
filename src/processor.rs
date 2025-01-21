@@ -152,23 +152,23 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        let mut info: ContractInfo = DataAccountUtils::read_account_data(contract_info_account)?;
+        let mut contract_info: ContractInfo = DataAccountUtils::read_account_data(contract_info_account)?;
+
+        let mut agent_info = AgentInfo::default();
+        agent_info.agent_id = contract_info.agent_counter;
 
         DataAccountUtils::create_related_account(
             program_id,
             payer_account,
             agent_account,
             Constants::PREFIX_AGENT_ADDRESS,
-            &info.agent_counter.to_le_bytes(),
+            &agent_info.agent_id.to_le_bytes(),
             Constants::SIZE_AGENT_INFO,
         )?;
-
-        let mut agent_info = AgentInfo::default();
-        agent_info.agent_id = info.agent_counter;
         DataAccountUtils::write_account_data(agent_account, agent_info)?;
 
-        info.agent_counter += 1;
-        DataAccountUtils::write_account_data(contract_info_account, info)?;
+        contract_info.agent_counter += 1;
+        DataAccountUtils::write_account_data(contract_info_account, contract_info)?;
 
         Ok(())
     }
@@ -177,9 +177,9 @@ impl Processor {
         program_id: &Pubkey,
         contract_info_account: &AccountInfo,
         agent_account: &AccountInfo,
-        agent_settings: AgentSettings,
+        initial_settings: AgentSettings,
     ) -> ProgramResult {
-        AgentManagerUtils::validate_agent_header(&agent_settings.agent_header)?;
+        AgentManagerUtils::validate_agent_header(&initial_settings.agent_header)?;
         DataAccountUtils::check_account_match(
             program_id,
             contract_info_account,
@@ -196,16 +196,8 @@ impl Processor {
             Err(AttpsAccountError::AgentAlreadyRemoved.into())
         } else {
             agent_info.is_registered = true;
-            agent_info.is_new_settings = true;
-            agent_info.agent_settings = agent_settings;
-            msg!("Writing agent info:");
-            msg!(" - agent_id: {}", agent_info.agent_id);
-            msg!(" - is_registered: {}", agent_info.is_registered);
-            msg!(" - is_allowed: {}", agent_info.is_allowed);
-            msg!(" - is_removed: {}", agent_info.is_removed);
-            msg!(" - is_new_settings: {}", agent_info.is_new_settings);
-            msg!(" - agent_settings: {:?}", agent_info.agent_settings);
-            msg!(" - agent_config: {:?}", agent_info.agent_config);
+            agent_info.agent_settings = initial_settings;
+            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }
@@ -238,10 +230,6 @@ impl Processor {
         agent_account: &AccountInfo,
         agent_id: u128,
     ) -> ProgramResult {
-        let contract_info: ContractInfo =
-            DataAccountUtils::read_account_data(contract_info_account)?;
-        contract_info.only_owner(owner_account.key)?;
-
         DataAccountUtils::check_account_match(
             program_id,
             contract_info_account,
@@ -255,19 +243,23 @@ impl Processor {
             &agent_id.to_le_bytes(),
         )?;
 
+        let contract_info: ContractInfo =
+            DataAccountUtils::read_account_data(contract_info_account)?;
+        contract_info.only_owner(owner_account.key)?;
+
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
         if !agent_info.is_registered {
             Err(AttpsAccountError::AgentNotRegistered.into())
         } else if agent_info.is_allowed {
-            agent_info.is_registered = false;
-            Ok(())
+            Err(AttpsAccountError::AgentAlreadyAllowed.into())
+        } else if agent_info.is_removed {
+            Err(AttpsAccountError::AgentAlreadyRemoved.into())
         } else {
             agent_info.is_registered = false;
             agent_info.is_allowed = true;
-            agent_info.is_new_settings = false;
-
+            
             let settings = agent_info.agent_settings.clone();
-            let config = AgentConfig {
+            agent_info.agent_config = AgentConfig {
                 config_digest: AgentManagerUtils::setting_digest_from_settings_data(
                     *agent_account.key,
                     &settings,
@@ -276,7 +268,8 @@ impl Processor {
                 is_active: true,
                 settings,
             };
-            agent_info.agent_config = config;
+
+            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)?;
             Ok(())
         }
@@ -286,36 +279,37 @@ impl Processor {
         program_id: &Pubkey,
         agent_account: &AccountInfo,
         agent_id: u128,
-        new_agent_settings: AgentSettings,
+        proposed_settings: AgentSettings,
     ) -> ProgramResult {
-        AgentManagerUtils::validate_agent_header(&new_agent_settings.agent_header)?;
         DataAccountUtils::check_account_match(
             program_id,
             agent_account,
             Constants::PREFIX_AGENT_ADDRESS,
             &agent_id.to_le_bytes(),
         )?;
+        AgentManagerUtils::validate_agent_header(&proposed_settings.agent_header)?;
 
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
         let settings = agent_info.agent_settings.clone();
-        let new_digest = AgentManagerUtils::setting_digest_from_settings_data(
+        let proposed_settings_digest = AgentManagerUtils::setting_digest_from_settings_data(
             *agent_account.key,
-            &new_agent_settings,
+            &proposed_settings,
         );
-        let digest =
-            AgentManagerUtils::setting_digest_from_settings_data(*agent_account.key, &settings);
+        let digest = agent_info.agent_config.config_digest;
 
-        if !agent_info.is_registered && !agent_info.is_allowed {
+        if (!agent_info.is_registered && !agent_info.is_allowed) || agent_info.is_removed {
             Err(AttpsAccountError::InvalidAllowedAgent.into())
         } else if settings.agent_header.source_agent_id
-            != new_agent_settings.agent_header.source_agent_id
+            != proposed_settings.agent_header.source_agent_id
         {
+            msg!("settings.agent_header.source_agent_id: {:?}", settings.agent_header.source_agent_id);
+            msg!("proposed_settings.agent_header.source_agent_id: {:?}", proposed_settings.agent_header.source_agent_id);
             Err(AgentHeaderError::InvalidAgentHeaderAgentId.into())
-        } else if (agent_info.is_registered || agent_info.is_new_settings) && new_digest == digest {
-            Err(AttpsAccountError::InvalidAgentConfig.into())
+        } else if digest == proposed_settings_digest {
+            Err(AttpsAccountError::DuplicateAgentSettings.into())
         } else {
-            agent_info.agent_settings = new_agent_settings;
-            agent_info.is_new_settings = true;
+            let _old_pending_settings = agent_info.pending_settings.replace(proposed_settings);
+            agent_info.print_values();
             DataAccountUtils::write_account_data(agent_account, agent_info)
         }
     }

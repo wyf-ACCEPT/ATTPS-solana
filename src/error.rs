@@ -28,6 +28,7 @@ pub enum AttpsAccountError {
     AgentNotRegistered,
     InvalidAllowedAgent,
     InvalidAgentConfig,
+    DuplicateAgentSettings,
 }
 
 impl From<AttpsAccountError> for ProgramError {

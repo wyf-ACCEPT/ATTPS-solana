@@ -162,7 +162,6 @@ mod instruction_test {
                     assert_eq!(agent.is_registered, true);
                     assert_eq!(agent.is_allowed, false);
                     assert_eq!(agent.is_removed, false);
-                    assert_eq!(agent.is_new_settings, true);
                     println!(
                         "✅ Agent registered successfully with ID: {}",
                         agent.agent_id
@@ -342,7 +341,6 @@ mod instruction_test {
                     assert_eq!(agent.is_registered, false);
                     assert_eq!(agent.is_allowed, true);
                     assert_eq!(agent.is_removed, false);
-                    assert_eq!(agent.is_new_settings, false);
                     println!("✅ Agent accepted successfully");
                     println!("✅ Agent config: {:?}", agent.agent_config);
                 }
@@ -475,11 +473,10 @@ mod instruction_test {
             match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
                 Ok(agent) => {
                     assert_eq!(agent.agent_id, 0);
-                    assert_eq!(agent.is_new_settings, true);
-                    assert_eq!(agent.agent_settings.threshold, 3);
-                    assert_eq!(agent.agent_settings.signers.len(), 3);
-                    println!("✅ Agent settings changed successfully");
-                    println!("✅ New agent settings: {:?}", agent.agent_settings);
+                    assert_eq!(agent.pending_settings.as_ref().unwrap().threshold, 3);
+                    assert_eq!(agent.pending_settings.as_ref().unwrap().signers.len(), 3);
+                    println!("✅ Agent settings change proposed successfully");
+                    println!("✅ New agent settings: {:?}", agent.pending_settings.as_ref());
                 }
                 Err(e) => {
                     println!("❌ Failed to deserialize agent data: {:?}", e);

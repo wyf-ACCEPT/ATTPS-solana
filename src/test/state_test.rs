@@ -1,6 +1,6 @@
 use crate::state::{
-    AgentConfig, AgentConfigState, AgentHeader, AgentSettings, MessagePayload, MessageType,
-    Metadata, Priority, Proofs,
+    AgentConfig, AgentHeader, AgentSettings, MessagePayload, MessageType, Metadata, Priority,
+    Proofs,
 };
 use borsh::BorshDeserialize;
 use solana_program::pubkey::Pubkey;
@@ -204,55 +204,5 @@ mod state_test {
         assert_eq!(config.config_block_number, deserialized.config_block_number);
         assert_eq!(config.is_active, deserialized.is_active);
         assert_eq!(config.settings.threshold, deserialized.settings.threshold);
-    }
-
-    #[test]
-    fn test_agent_config_state_serialization() {
-        let config_state = AgentConfigState {
-            latest_config_digest: [2; 32],
-            configs: vec![AgentConfig {
-                config_digest: [1; 32],
-                config_block_number: 12345,
-                is_active: true,
-                settings: AgentSettings {
-                    signers: vec![[1; 20]],
-                    threshold: 1,
-                    converter_address: Pubkey::new_unique(),
-                    agent_header: AgentHeader {
-                        version: "1.0.0".to_string(),
-                        message_id: "msg123".to_string(),
-                        source_agent_id: "agent1".to_string(),
-                        source_agent_name: "TestAgent".to_string(),
-                        target_agent_id: "agent2".to_string(),
-                        timestamp: 1234567890,
-                        message_type: MessageType::Request,
-                        priority: Priority::High,
-                        ttl: 3600,
-                    },
-                },
-            }],
-        };
-
-        let serialized = borsh::to_vec(&config_state).expect("Failed to serialize");
-        let deserialized =
-            AgentConfigState::try_from_slice(&serialized).expect("Failed to deserialize");
-
-        println!(
-            "📝 AgentConfigState serialized bytes (length ~ {} bytes): {:?}\n\
-             ✅ AgentConfigState deserialized successfully: {:?}\n",
-            serialized.len(),
-            serialized,
-            deserialized
-        );
-
-        assert_eq!(
-            config_state.latest_config_digest,
-            deserialized.latest_config_digest
-        );
-        assert_eq!(config_state.configs.len(), deserialized.configs.len());
-        assert_eq!(
-            config_state.configs[0].config_digest,
-            deserialized.configs[0].config_digest
-        );
     }
 }

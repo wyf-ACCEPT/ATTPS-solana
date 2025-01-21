@@ -1,5 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
+use solana_program::{entrypoint::ProgramResult, msg, pubkey::Pubkey};
 
 use crate::error::StateError;
 
@@ -145,27 +145,6 @@ pub struct AgentConfig {
     pub settings: AgentSettings,
 }
 
-/// State container for agent configurations.
-///
-/// # Size
-///
-/// Fixed size components:
-/// - latest_config_digest: 32 bytes ([u8; 32])
-///
-/// Variable size components:
-/// - configs: (4 + configs.len()*config_size) bytes
-///   where config_size is the size of AgentConfig
-///
-/// Total size = 36 + (configs.len() * config_size)
-///
-/// Size too large. Drop this.
-#[deprecated]
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
-pub struct AgentConfigState {
-    pub latest_config_digest: [u8; 32],
-    pub configs: Vec<AgentConfig>,
-}
-
 /// Basic information about the contract.
 ///
 /// # Size
@@ -196,18 +175,32 @@ pub struct ContractInfo {
 /// - is_removed: 1 byte (bool)
 /// - is_new_settings: 1 byte (bool)
 /// - agent_settings: See AgentSettings struct size calculation
+/// - pending_settings: See AgentSettings struct size calculation
 /// - agent_config: See AgentConfig struct size calculation
 ///
-/// Total size = 20 + settings_size + config_size
+/// Total size = 20 + 2 * settings_size + config_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentInfo {
     pub agent_id: u128, // Unique auto-incrementing identifier
     pub is_registered: bool,
     pub is_allowed: bool,
     pub is_removed: bool,
-    pub is_new_settings: bool,
     pub agent_settings: AgentSettings,
+    pub pending_settings: Option<AgentSettings>,
     pub agent_config: AgentConfig,
+}
+
+impl AgentInfo {
+    pub fn print_values(&self) {
+        msg!("Writing agent info:");
+        msg!(" - agent_id: {}", self.agent_id);
+        msg!(" - is_registered: {}", self.is_registered);
+        msg!(" - is_allowed: {}", self.is_allowed);
+        msg!(" - is_removed: {}", self.is_removed);
+        msg!(" - agent_settings: {:?}", self.agent_settings);
+        msg!(" - pending_settings: {:?}", self.pending_settings);
+        msg!(" - agent_config: {:?}", self.agent_config);
+    }
 }
 
 impl ContractInfo {
