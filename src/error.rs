@@ -1,5 +1,5 @@
-use solana_program::program_error::ProgramError;
 use solana_program::instruction::InstructionError;
+use solana_program::program_error::ProgramError;
 
 #[derive(Debug)]
 pub enum VerificationError {

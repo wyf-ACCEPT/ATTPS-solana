@@ -476,7 +476,10 @@ mod instruction_test {
                     assert_eq!(agent.pending_settings.as_ref().unwrap().threshold, 3);
                     assert_eq!(agent.pending_settings.as_ref().unwrap().signers.len(), 3);
                     println!("✅ Agent settings change proposed successfully");
-                    println!("✅ New agent settings: {:?}", agent.pending_settings.as_ref());
+                    println!(
+                        "✅ New agent settings: {:?}",
+                        agent.pending_settings.as_ref()
+                    );
                 }
                 Err(e) => {
                     println!("❌ Failed to deserialize agent data: {:?}", e);

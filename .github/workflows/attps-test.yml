@@ -2,9 +2,9 @@ name: ATTPS protocol test
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop, main ]
   pull_request:
-    branches: [ develop ]
+    branches: [ develop, main ]
 
 env:
   CARGO_TERM_COLOR: always
