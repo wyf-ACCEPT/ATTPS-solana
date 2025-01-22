@@ -1,13 +1,13 @@
 use crate::constants::Constants;
-use crate::error::{AgentHeaderError, AttpsAccountError};
+use crate::error::{AgentHeaderError, AttpsAccountError, VerificationError};
 use crate::instruction::AgentInstruction;
 use crate::state::{AgentConfig, AgentInfo, AgentSettings, ContractInfo, MessagePayload};
-use crate::utils::{AgentManagerUtils, DataAccountUtils};
+use crate::utils::{AgentManagerUtils, AgentUtils, DataAccountUtils};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     clock::Clock,
     entrypoint::ProgramResult,
-    msg,
+    keccak, msg,
     pubkey::Pubkey,
     sysvar::Sysvar,
 };
@@ -410,7 +410,45 @@ impl Processor {
         settings_digest: [u8; 32],
         payload: MessagePayload,
     ) -> ProgramResult {
-        // TODO: Verify message payload
-        Ok(())
+        DataAccountUtils::check_account_match(
+            program_id,
+            agent_account,
+            Constants::PREFIX_AGENT_ADDRESS,
+            &agent_id.to_le_bytes(),
+        )?;
+        let agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
+
+        let data = AgentManagerUtils::validate_data_conversion(*agent_account.key, payload.data)?;
+        let hash = keccak::hash(&data).to_bytes();
+
+        if !agent_info.is_allowed || agent_info.is_removed {
+            Err(AttpsAccountError::InvalidAllowedAgent.into())
+        } else if hash != payload.data_hash {
+            Err(VerificationError::InvalidDataHash.into())
+        } else if payload.proofs.signature_proof.is_empty()
+            && payload.proofs.zk_proof.is_empty()
+            && payload.proofs.merkle_proof.is_empty()
+        {
+            Err(VerificationError::InvalidProofData.into())
+        } else {
+            let allowed_signers = agent_info.agent_settings.signers;
+            let threshold = agent_info.agent_settings.threshold;
+            if !payload.proofs.signature_proof.is_empty() {
+                AgentUtils::verify_signature(
+                    &settings_digest,
+                    &hash,
+                    &payload.proofs.signature_proof,
+                    &allowed_signers,
+                    threshold,
+                )?;
+            }
+            if !payload.proofs.zk_proof.is_empty() {
+                AgentUtils::verify_zk(&settings_digest, &hash, &payload.proofs.zk_proof)?;
+            }
+            if !payload.proofs.merkle_proof.is_empty() {
+                AgentUtils::verify_merkle(&settings_digest, &hash, &payload.proofs.merkle_proof)?;
+            }
+            Ok(())
+        }
     }
 }

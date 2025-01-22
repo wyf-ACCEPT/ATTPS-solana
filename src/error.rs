@@ -8,6 +8,8 @@ pub enum VerificationError {
     DuplicateSigner,
     SignerNotAllowed,
     InvalidSignatureProof,
+    InvalidDataHash = 151,
+    InvalidProofData,
 }
 
 impl From<VerificationError> for ProgramError {

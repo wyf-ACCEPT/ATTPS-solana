@@ -94,11 +94,6 @@ impl AgentUtils {
         addresses.iter().any(|addr| addr == target)
     }
 
-    /// Add an Ethereum-style address to a vector if it doesn't exist
-    pub fn address_pushback(addresses: &mut Vec<[u8; 20]>, address: [u8; 20]) {
-        addresses.push(address);
-    }
-
     /// Convert a recovered Secp256k1 public key to an Ethereum address
     pub fn pubkey_to_eth_address(pubkey: &Secp256k1Pubkey) -> [u8; 20] {
         let hash = keccak::hash(&pubkey.to_bytes()).to_bytes();
@@ -288,6 +283,12 @@ impl AgentManagerUtils {
         hash[0] = 0x01;
         hash[1] = 0x00;
         hash
+    }
+
+    /// Validates and optionally converts input data for a given agent
+    /// To be implemented in the future
+    pub fn validate_data_conversion(_agent: Pubkey, data: Vec<u8>) -> Result<Vec<u8>, ProgramError> {
+        Ok(data)
     }
 
     /// Validates a message type enum value (no need in rust)

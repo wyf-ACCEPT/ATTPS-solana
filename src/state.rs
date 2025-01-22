@@ -1,5 +1,5 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey};
+use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 
 use crate::error::StateError;
 
@@ -188,18 +188,6 @@ pub struct AgentInfo {
     pub agent_settings: AgentSettings,
     pub pending_settings: Option<AgentSettings>,
     pub agent_config: AgentConfig,
-}
-
-impl AgentInfo {
-    pub fn print_values(&self) {
-        println!(" - agent_id: {}", self.agent_id);
-        println!(" - is_registered: {}", self.is_registered);
-        println!(" - is_allowed: {}", self.is_allowed);
-        println!(" - is_removed: {}", self.is_removed);
-        println!(" - agent_settings: {:?}", self.agent_settings);
-        println!(" - pending_settings: {:?}", self.pending_settings);
-        println!(" - agent_config: {:?}", self.agent_config);
-    }
 }
 
 impl ContractInfo {

@@ -32,7 +32,7 @@ mod utils_agent_test {
         );
 
         // Test adding first address
-        AgentUtils::address_pushback(&mut addresses, addr1);
+        addresses.push(addr1);
         assert!(
             AgentUtils::address_exists(&addresses, &addr1),
             "Address should exist after adding"
@@ -40,8 +40,8 @@ mod utils_agent_test {
         assert_eq!(addresses.len(), 1, "Vector should have length 1");
 
         // Test adding multiple unique addresses
-        AgentUtils::address_pushback(&mut addresses, addr2);
-        AgentUtils::address_pushback(&mut addresses, addr3);
+        addresses.push(addr2);
+        addresses.push(addr3);
         assert!(
             AgentUtils::address_exists(&addresses, &addr2),
             "Second address should exist"

@@ -1,5 +1,5 @@
 use crate::constants::Constants;
-use crate::state::{AgentHeader, AgentSettings, MessageType, Priority};
+use crate::state::{AgentHeader, AgentInfo, AgentSettings, MessageType, Priority};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{pubkey::Pubkey, system_program};
 use solana_program_test::*;
@@ -8,6 +8,18 @@ use solana_sdk::{
     signature::Signer,
     transaction::Transaction,
 };
+
+impl AgentInfo {
+    pub fn print_values(&self) {
+        println!(" - agent_id: {}", self.agent_id);
+        println!(" - is_registered: {}", self.is_registered);
+        println!(" - is_allowed: {}", self.is_allowed);
+        println!(" - is_removed: {}", self.is_removed);
+        println!(" - agent_settings: {:?}", self.agent_settings);
+        println!(" - pending_settings: {:?}", self.pending_settings);
+        println!(" - agent_config: {:?}", self.agent_config);
+    }
+}
 
 #[cfg(test)]
 mod instruction_test {
