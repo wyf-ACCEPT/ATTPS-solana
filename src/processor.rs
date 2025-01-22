@@ -400,7 +400,6 @@ impl Processor {
         agent_info.is_registered = false;
         agent_info.is_allowed = false;
         agent_info.is_removed = true;
-        agent_info.print_values();
         DataAccountUtils::write_account_data(agent_account, agent_info)
     }
 

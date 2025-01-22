@@ -22,7 +22,7 @@ mod instruction_test {
     use super::*;
 
     #[tokio::test]
-    async fn test_initialize_create_register() {
+    async fn test_initialize_create_register_remove() {
         // 1. Setup environment
         let program_id = Pubkey::new_unique();
         let owner_account = Keypair::new();
@@ -257,6 +257,52 @@ mod instruction_test {
                 }
             }
         }
+
+        // 7. Remove the agent
+        println!("\nTesting agent removal...");
+        let remove_instruction_data = {
+            let mut data = vec![7]; // 7 = RemoveAgent instruction
+            data.extend_from_slice(&0u128.to_le_bytes()); // agent_id = 0
+            data
+        };
+
+        let remove_instruction = Instruction::new_with_bytes(
+            program_id,
+            &remove_instruction_data,
+            vec![
+                AccountMeta::new(owner_account.pubkey(), true),
+                AccountMeta::new(contract_info_pubkey, false),
+                AccountMeta::new(agent_pubkey, false),
+            ],
+        );
+
+        let mut transaction =
+            Transaction::new_with_payer(&[remove_instruction], Some(&payer.pubkey()));
+        transaction.sign(&[&payer, &owner_account], recent_blockhash);
+        banks_client.process_transaction(transaction).await.unwrap();
+
+        let account = banks_client
+            .get_account(agent_pubkey)
+            .await
+            .expect("Failed to get agent account");
+
+        if let Some(account_data) = account {
+            let length = u32::from_le_bytes(account_data.data[..4].try_into().unwrap()) as usize;
+            match AgentInfo::try_from_slice(&account_data.data[4..4 + length]) {
+                Ok(agent) => {
+                    assert_eq!(agent.agent_id, 0);
+                    assert_eq!(agent.is_registered, false);
+                    assert_eq!(agent.is_allowed, false);
+                    assert_eq!(agent.is_removed, true);
+                    println!("✅ Agent removed successfully");
+                    agent.print_values();
+                }
+                Err(e) => {
+                    println!("❌ Failed to deserialize agent data: {:?}", e);
+                    panic!("Failed to deserialize agent data: {:?}", e);
+                }
+            }
+        }
     }
 
     #[tokio::test]
@@ -377,7 +423,10 @@ mod instruction_test {
             data
         };
 
-        println!("Change settings instruction data: {:?}", change_settings_instruction_data);
+        println!(
+            "Change settings instruction data: {:?}",
+            change_settings_instruction_data
+        );
 
         let change_settings_instruction = Instruction::new_with_bytes(
             program_id,
