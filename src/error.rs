@@ -18,6 +18,12 @@ impl From<VerificationError> for ProgramError {
     }
 }
 
+impl From<VerificationError> for InstructionError {
+    fn from(e: VerificationError) -> Self {
+        InstructionError::Custom(e as u32)
+    }
+}
+
 #[derive(Debug)]
 pub enum AttpsAccountError {
     PdaAccountMismatch = 201,

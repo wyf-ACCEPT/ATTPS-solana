@@ -287,7 +287,10 @@ impl AgentManagerUtils {
 
     /// Validates and optionally converts input data for a given agent
     /// To be implemented in the future
-    pub fn validate_data_conversion(_agent: Pubkey, data: Vec<u8>) -> Result<Vec<u8>, ProgramError> {
+    pub fn validate_data_conversion(
+        _agent: Pubkey,
+        data: Vec<u8>,
+    ) -> Result<Vec<u8>, ProgramError> {
         Ok(data)
     }
 
