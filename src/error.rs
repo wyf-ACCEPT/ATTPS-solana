@@ -29,6 +29,7 @@ pub enum AttpsAccountError {
     PdaAccountMismatch = 201,
     PdaAccountNotWritable,
     PdaAccountAlreadyCreated,
+    PdaAccountNotOwned,
     AgentAlreadyRegistered,
     AgentAlreadyAllowed,
     AgentAlreadyRemoved,

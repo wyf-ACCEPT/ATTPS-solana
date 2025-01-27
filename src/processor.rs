@@ -68,7 +68,7 @@ impl Processor {
                     agent_settings,
                 )
             }
-            AgentInstruction::AcceptAgent { agent_id } => {
+            AgentInstruction::AcceptAgent => {
                 let owner_account = next_account_info(accounts_iter)?;
                 let contract_info_account = next_account_info(accounts_iter)?;
                 let agent_account = next_account_info(accounts_iter)?;
@@ -77,22 +77,17 @@ impl Processor {
                     owner_account,
                     contract_info_account,
                     agent_account,
-                    agent_id,
                 )
             }
-            AgentInstruction::ChangeAgentSettingProposal {
-                agent_id,
-                proposed_settings,
-            } => {
+            AgentInstruction::ChangeAgentSettingProposal { proposed_settings } => {
                 let agent_account = next_account_info(accounts_iter)?;
                 Self::process_change_agent_setting_proposal(
                     program_id,
                     agent_account,
-                    agent_id,
                     proposed_settings,
                 )
             }
-            AgentInstruction::AcceptAgentSettingProposal { agent_id } => {
+            AgentInstruction::AcceptAgentSettingProposal => {
                 let owner_account = next_account_info(accounts_iter)?;
                 let contract_info_account = next_account_info(accounts_iter)?;
                 let agent_account = next_account_info(accounts_iter)?;
@@ -101,10 +96,9 @@ impl Processor {
                     owner_account,
                     contract_info_account,
                     agent_account,
-                    agent_id,
                 )
             }
-            AgentInstruction::RemoveAgent { agent_id } => {
+            AgentInstruction::RemoveAgent => {
                 let owner_account = next_account_info(accounts_iter)?;
                 let contract_info_account = next_account_info(accounts_iter)?;
                 let agent_account = next_account_info(accounts_iter)?;
@@ -113,22 +107,14 @@ impl Processor {
                     owner_account,
                     contract_info_account,
                     agent_account,
-                    agent_id,
                 )
             }
             AgentInstruction::Verify {
-                agent_id,
                 settings_digest,
                 payload,
             } => {
                 let agent_account = next_account_info(accounts_iter)?;
-                Self::process_verify(
-                    program_id,
-                    agent_account,
-                    agent_id,
-                    settings_digest,
-                    payload,
-                )
+                Self::process_verify(program_id, agent_account, settings_digest, payload)
             }
         }
     }
@@ -184,7 +170,7 @@ impl Processor {
             program_id,
             payer_account,
             agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
+            Constants::_PREFIX_AGENT_ADDRESS,
             &agent_info.agent_id.to_le_bytes(),
             Constants::SIZE_AGENT_INFO,
         )?;
@@ -248,7 +234,6 @@ impl Processor {
         owner_account: &AccountInfo,
         contract_info_account: &AccountInfo,
         agent_account: &AccountInfo,
-        agent_id: u128,
     ) -> ProgramResult {
         DataAccountUtils::check_account_match(
             program_id,
@@ -256,12 +241,7 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        DataAccountUtils::check_account_match(
-            program_id,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &agent_id.to_le_bytes(),
-        )?;
+        DataAccountUtils::check_account_ownership(program_id, contract_info_account)?;
 
         let contract_info: ContractInfo =
             DataAccountUtils::read_account_data(contract_info_account)?;
@@ -295,15 +275,9 @@ impl Processor {
     fn process_change_agent_setting_proposal(
         program_id: &Pubkey,
         agent_account: &AccountInfo,
-        agent_id: u128,
         proposed_settings: AgentSettings,
     ) -> ProgramResult {
-        DataAccountUtils::check_account_match(
-            program_id,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &agent_id.to_le_bytes(),
-        )?;
+        DataAccountUtils::check_account_ownership(program_id, agent_account)?;
         AgentManagerUtils::validate_agent_header(&proposed_settings.agent_header)?;
 
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
@@ -333,7 +307,6 @@ impl Processor {
         owner_account: &AccountInfo,
         contract_info_account: &AccountInfo,
         agent_account: &AccountInfo,
-        agent_id: u128,
     ) -> ProgramResult {
         DataAccountUtils::check_account_match(
             program_id,
@@ -341,12 +314,7 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        DataAccountUtils::check_account_match(
-            program_id,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &agent_id.to_le_bytes(),
-        )?;
+        DataAccountUtils::check_account_ownership(program_id, agent_account)?;
 
         let contract_info: ContractInfo =
             DataAccountUtils::read_account_data(contract_info_account)?;
@@ -377,7 +345,6 @@ impl Processor {
         owner_account: &AccountInfo,
         contract_info_account: &AccountInfo,
         agent_account: &AccountInfo,
-        agent_id: u128,
     ) -> ProgramResult {
         DataAccountUtils::check_account_match(
             program_id,
@@ -385,12 +352,7 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        DataAccountUtils::check_account_match(
-            program_id,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &agent_id.to_le_bytes(),
-        )?;
+        DataAccountUtils::check_account_ownership(program_id, agent_account)?;
 
         let contract_info: ContractInfo =
             DataAccountUtils::read_account_data(contract_info_account)?;
@@ -406,16 +368,10 @@ impl Processor {
     fn process_verify(
         program_id: &Pubkey,
         agent_account: &AccountInfo,
-        agent_id: u128,
         settings_digest: [u8; 32],
         payload: MessagePayload,
     ) -> ProgramResult {
-        DataAccountUtils::check_account_match(
-            program_id,
-            agent_account,
-            Constants::PREFIX_AGENT_ADDRESS,
-            &agent_id.to_le_bytes(),
-        )?;
+        DataAccountUtils::check_account_ownership(program_id, agent_account)?;
         let agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
 
         let data = AgentManagerUtils::validate_data_conversion(*agent_account.key, payload.data)?;
