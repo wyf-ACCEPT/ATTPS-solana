@@ -170,7 +170,7 @@ impl Processor {
             program_id,
             payer_account,
             agent_account,
-            Constants::_PREFIX_AGENT_ADDRESS,
+            Constants::PREFIX_AGENT_ADDRESS,
             &agent_info.agent_id.to_le_bytes(),
             Constants::SIZE_AGENT_INFO,
         )?;
@@ -241,7 +241,7 @@ impl Processor {
             Constants::PREFIX_CONTRACT_INFO,
             b"",
         )?;
-        DataAccountUtils::check_account_ownership(program_id, contract_info_account)?;
+        DataAccountUtils::check_account_ownership(program_id, agent_account)?;
 
         let contract_info: ContractInfo =
             DataAccountUtils::read_account_data(contract_info_account)?;

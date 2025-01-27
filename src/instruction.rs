@@ -42,9 +42,7 @@ pub enum AgentInstruction {
     /// [5] Change an agent setting proposal
     ///
     /// 0. [writable] agent data account
-    ChangeAgentSettingProposal {
-        proposed_settings: AgentSettings,
-    },
+    ChangeAgentSettingProposal { proposed_settings: AgentSettings },
 
     /// [6] Accept an agent setting proposal
     ///
@@ -91,9 +89,7 @@ impl AgentInstruction {
                 // For ChangeAgentSettingProposal, parse AgentSettings
                 let proposed_settings = AgentSettings::try_from_slice(rest)
                     .map_err(|_| ProgramError::InvalidInstructionData)?;
-                Ok(Self::ChangeAgentSettingProposal {
-                    proposed_settings,
-                })
+                Ok(Self::ChangeAgentSettingProposal { proposed_settings })
             }
             6 => Ok(Self::AcceptAgentSettingProposal),
             7 => Ok(Self::RemoveAgent),

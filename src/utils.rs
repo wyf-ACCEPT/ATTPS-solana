@@ -51,10 +51,7 @@ impl DataAccountUtils {
         }
     }
 
-    pub fn check_account_ownership(
-        program_id: &Pubkey,
-        account: &AccountInfo,
-    ) -> ProgramResult {
+    pub fn check_account_ownership(program_id: &Pubkey, account: &AccountInfo) -> ProgramResult {
         match account.owner == program_id {
             true => Ok(()),
             false => Err(AttpsAccountError::PdaAccountNotOwned.into()),

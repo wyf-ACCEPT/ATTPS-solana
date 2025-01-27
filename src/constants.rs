@@ -2,7 +2,7 @@ pub struct Constants;
 
 impl Constants {
     pub const PREFIX_CONTRACT_INFO: &'static [u8] = b"contract-info";
-    pub const _PREFIX_AGENT_ADDRESS: &'static [u8] = b"agent";
+    pub const PREFIX_AGENT_ADDRESS: &'static [u8] = b"agent";
 
     // Account sizes
     pub const _SIZE_AGENT_HEADER: usize = 256;
