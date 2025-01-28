@@ -144,3 +144,12 @@ Tests are located in `./src/test/` directory:
    - Use descriptive commit messages
    - Keep PRs focused and well-scoped
 
+
+
+
+(TODO)
+
+Run `sh ./script/deploy.sh` to deploy the program to the devnet.
+Run `sh ./script/deploy.sh --help` to see the help message.
+
+Run `cargo run --package attps_script` to test on-chain (devnet).

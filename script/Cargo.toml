@@ -1,0 +1,14 @@
+[package]
+name = "attps_script"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hex = "0.4.3"
+dotenv = "0.15"
+solana-client = "1.18.26"
+solana-sdk = "1.18.26"
+
+[[bin]]
+name = "attps_script"
+path = "interact.rs"

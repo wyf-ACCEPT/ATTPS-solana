@@ -20,3 +20,6 @@ tokio = "1.43.0"
 enum_glob_use = "deny"
 suspicious = "warn"
 unsafe_code = "forbid"
+
+[workspace]
+members = ["script"]

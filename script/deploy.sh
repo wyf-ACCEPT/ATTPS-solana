@@ -52,21 +52,24 @@ if [[ ! -f "$KEYPAIR_PATH" ]]; then
     exit 1
 fi
 
-echo "\nDeploying ATTPS program to Solana $NETWORK..."
+echo "\n"
+echo "Deploying ATTPS program to Solana $NETWORK..."
 
 # Configure Solana CLI
 solana config set --url "$NETWORK"
 solana config set --keypair "$KEYPAIR_PATH"
 
 # Build the program
-echo "\nBuilding program..."
+echo "\n"
+echo "Building program..."
 cargo build-sbf
 
 # Get the program keypair path
 PROGRAM_KEYPAIR="target/deploy/attps_solana-keypair.json"
 
 # Deploy the program
-echo "\nDeploying program..."
+echo "\n"
+echo "Deploying program..."
 solana program deploy \
     --program-id "$PROGRAM_KEYPAIR" \
     "target/deploy/attps_solana.so"
@@ -74,7 +77,8 @@ solana program deploy \
 # Get program ID
 PROGRAM_ID=$(solana-keygen pubkey "$PROGRAM_KEYPAIR")
 
-echo "\nDeployment complete!"
+echo "\n"
+echo "Deployment complete!"
 echo "Program ID: $PROGRAM_ID"
 echo "Network: $NETWORK"
 echo ""
