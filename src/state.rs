@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 
@@ -199,5 +200,55 @@ impl ContractInfo {
         } else {
             Ok(())
         }
+    }
+}
+
+impl Display for AgentSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AgentSettings {{ signers: [")?;
+        for (i, signer) in self.signers.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "0x{}", hex::encode(signer))?;
+        }
+        write!(
+            f,
+            "], threshold: {}, converter_address: {}, agent_header: {:?} }}",
+            self.threshold, self.converter_address, self.agent_header
+        )
+    }
+}
+
+impl Display for AgentConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AgentConfig {{ config_digest: {}, config_block_number: {}, is_active: {}, settings: {} }}",
+            hex::encode(self.config_digest),
+            self.config_block_number,
+            self.is_active,
+            self.settings,
+        )
+    }
+}
+
+impl Display for AgentInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Agent state: \n - agent_id: {}\n - is_registered: {}\n - is_allowed: {}\n - is_removed: {}\n",
+            self.agent_id, self.is_registered, self.is_allowed, self.is_removed
+        )?;
+        write!(
+            f,
+            " - agent_settings: {}\n - pending_settings: {}\n - agent_config: {}",
+            self.agent_settings,
+            match &self.pending_settings {
+                Some(settings) => format!("Some({})", settings),
+                None => "None".to_string(),
+            },
+            self.agent_config
+        )
     }
 }

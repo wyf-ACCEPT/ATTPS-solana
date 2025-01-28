@@ -1,10 +1,10 @@
 mod constants;
 mod entrypoint;
 mod error;
-mod instruction;
 mod processor;
-mod state;
 mod utils;
+mod instruction;
+pub mod state;
 
 #[cfg(test)]
 mod test {
