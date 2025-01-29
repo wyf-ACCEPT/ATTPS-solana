@@ -93,53 +93,57 @@ fn main() {
     let program_id = Pubkey::from_str(&program_id_base58).expect("Invalid program id");
     println!("Program id: {}\n", program_id);
 
-    // Match command
+    // Parse command line arguments first
     let matches = Command::new("ATTPS scripts for interacting with Solana")
         .version("1.0")
         .author("PlanD")
         .about("Interacts with the blockchain")
+        .arg_required_else_help(true)
         .subcommand(
-            Command::new("view_agent")
+            Command::new("view-agent")
                 .about("View information about an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
-        .subcommand(Command::new("generate_keypair").about("Generates a new keypair"))
+        .subcommand(Command::new("generate-keypair").about("Generates a new keypair"))
         .subcommand(Command::new("initialize").about("Initializes the contract"))
-        .subcommand(Command::new("create_agent").about("Creates a new agent"))
+        .subcommand(Command::new("create-agent").about("Creates a new agent"))
         .subcommand(
-            Command::new("register_agent")
+            Command::new("register-agent")
                 .about("Registers an existing agent data account")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
         .subcommand(
-            Command::new("create_and_register_agent")
+            Command::new("create-and-register-agent")
                 .about("Creates and registers a new agent in one transaction"),
         )
         .subcommand(
-            Command::new("accept_agent")
+            Command::new("accept-agent")
                 .about("Accepts an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
         .subcommand(
-            Command::new("change_agent_setting_proposal")
+            Command::new("change-agent-setting-proposal")
                 .about("Proposes new settings for an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
         .subcommand(
-            Command::new("accept_agent_setting_proposal")
+            Command::new("accept-agent-setting-proposal")
                 .about("Accepts proposed settings for an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
         .subcommand(
-            Command::new("remove_agent")
+            Command::new("remove-agent")
                 .about("Removes an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true)),
         )
         .subcommand(
             Command::new("verify")
                 .about("Verifies a message from an agent")
-                .arg(arg!(--agent_id <AGENT_ID> "Agent ID (u128)"))
-                .arg(arg!(--settings_digest <DIGEST> "Settings digest as 32-byte hex string")),
+                .arg(arg!(-a --"agent-id" <AGENT_ID> "Agent ID (u128)").required(true))
+                .arg(
+                    arg!(-d --"settings-digest" <DIGEST> "Settings digest as 32-byte hex string")
+                        .required(true),
+                ),
         )
         .get_matches();
 
@@ -147,19 +151,20 @@ fn main() {
     let (contract_info_pubkey, _) = Pubkey::find_program_address(&[b"contract-info"], &program_id);
     println!("Contract info pubkey: {}\n", contract_info_pubkey);
 
+    // Match command using the matches we already defined above
     match matches.subcommand() {
-        Some(("view_agent", matches)) => {
+        Some(("view-agent", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
             let (agent_pubkey, _) =
                 Pubkey::find_program_address(&[b"agent", &agent_id.to_le_bytes()], &program_id);
             println!("Agent pubkey (id: {}): {}\n", agent_id, agent_pubkey);
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("generate_keypair", _)) => {
+        Some(("generate-keypair", _)) => {
             let keypair = Keypair::new();
             println!("Keypair: {:?}", hex::encode(keypair.to_bytes()));
             println!("Pubkey: {:?}", keypair.pubkey());
@@ -203,7 +208,7 @@ fn main() {
                     .expect("Failed to deserialize counter data");
             println!("Contract info data: {:?}\n", info);
         }
-        Some(("create_agent", _)) => {
+        Some(("create-agent", _)) => {
             let contract_info_data = client.get_account_data(&contract_info_pubkey).unwrap();
             let length = u32::from_le_bytes(contract_info_data[0..4].try_into().unwrap()) as usize;
             let info: ContractInfo =
@@ -238,12 +243,12 @@ fn main() {
             }
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("register_agent", matches)) => {
+        Some(("register-agent", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
             let agent_settings = default_agent_settings();
 
             let (agent_pubkey, _) =
@@ -277,7 +282,7 @@ fn main() {
             }
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("create_and_register_agent", _)) => {
+        Some(("create-and-register-agent", _)) => {
             let contract_info_data = client.get_account_data(&contract_info_pubkey).unwrap();
             let length = u32::from_le_bytes(contract_info_data[0..4].try_into().unwrap()) as usize;
             let info: ContractInfo =
@@ -321,12 +326,12 @@ fn main() {
             }
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("accept_agent", matches)) => {
+        Some(("accept-agent", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
 
             let (agent_pubkey, _) =
                 Pubkey::find_program_address(&[b"agent", &agent_id.to_le_bytes()], &program_id);
@@ -355,12 +360,12 @@ fn main() {
             }
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("change_agent_setting_proposal", matches)) => {
+        Some(("change-agent-setting-proposal", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
             let proposed_settings = default_agent_settings_another();
 
             let (agent_pubkey, _) =
@@ -394,12 +399,12 @@ fn main() {
             }
             print_agent_info(&client, &agent_pubkey);
         }
-        Some(("accept_agent_setting_proposal", matches)) => {
+        Some(("accept-agent-setting-proposal", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
 
             let (agent_pubkey, _) =
                 Pubkey::find_program_address(&[b"agent", &agent_id.to_le_bytes()], &program_id);
@@ -440,12 +445,12 @@ fn main() {
                 .expect("Failed to deserialize agent data");
             println!("✅ {}", info);
         }
-        Some(("remove_agent", matches)) => {
+        Some(("remove-agent", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
 
             let (agent_pubkey, _) =
                 Pubkey::find_program_address(&[b"agent", &agent_id.to_le_bytes()], &program_id);
@@ -476,14 +481,14 @@ fn main() {
         }
         Some(("verify", matches)) => {
             let agent_id: u128 = matches
-                .get_one::<String>("agent_id")
-                .expect("agent_id is required")
+                .get_one::<String>("agent-id")
+                .expect("agent-id is required")
                 .parse()
-                .expect("agent_id must be a valid u128");
+                .expect("agent-id must be a valid u128");
 
             let settings_digest_hex = matches
-                .get_one::<String>("settings_digest")
-                .expect("settings_digest is required");
+                .get_one::<String>("settings-digest")
+                .expect("settings-digest is required");
             let settings_digest = hex::decode(settings_digest_hex)
                 .expect("settings_digest must be a valid hex string of 32 bytes");
             if settings_digest.len() != 32 {

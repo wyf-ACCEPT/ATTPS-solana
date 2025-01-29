@@ -145,11 +145,81 @@ Tests are located in `./src/test/` directory:
    - Keep PRs focused and well-scoped
 
 
+## Interaction Script Usage
 
+The project includes a command-line tool for interacting with the deployed Solana program. You can use this tool to manage agents and verify messages.
 
-(TODO)
+### Available Commands
+
+```bash
+# Initialize the contract
+cargo run --package attps_script -- initialize
+
+# Create a new agent
+cargo run --package attps_script -- create-agent
+
+# Register an existing agent
+cargo run --package attps_script -- register-agent -a <ID>
+# or using long form
+cargo run --package attps_script -- register-agent --agent-id <ID>
+
+# Create and register an agent in one transaction
+cargo run --package attps_script -- create-and-register-agent
+
+# Accept an agent
+cargo run --package attps_script -- accept-agent -a <ID>
+# or using long form
+cargo run --package attps_script -- accept-agent --agent-id <ID>
+
+# Propose new settings for an agent
+cargo run --package attps_script -- change-agent-setting-proposal -a <ID>
+# or using long form
+cargo run --package attps_script -- change-agent-setting-proposal --agent-id <ID>
+
+# Accept proposed settings for an agent
+cargo run --package attps_script -- accept-agent-setting-proposal -a <ID>
+# or using long form
+cargo run --package attps_script -- accept-agent-setting-proposal --agent-id <ID>
+
+# Remove an agent
+cargo run --package attps_script -- remove-agent -a <ID>
+# or using long form
+cargo run --package attps_script -- remove-agent --agent-id <ID>
+
+# Verify a message from an agent
+cargo run --package attps_script -- verify -a <ID> -d <32_BYTE_HEX>
+# or using long form
+cargo run --package attps_script -- verify --agent-id <ID> --settings-digest <32_BYTE_HEX>
+```
+
+### Example Usage
+
+```bash
+# Create and register a new agent
+cargo run --package attps_script -- create-and-register-agent
+
+# Accept agent with ID 4
+cargo run --package attps_script -- accept-agent --agent-id 4
+
+# Verify a message from agent 4
+cargo run --package attps_script -- verify --agent-id 4 --settings-digest 0100231df1ab9e7cbdea3018c65ddced9598e0a13942cb4480d3798da83dfd2f
+```
+
+### Help and Version Information
+
+```bash
+# Show help information
+cargo run --package attps_script -- --help
+# or
+cargo run --package attps_script -- -h
+
+# Show version information
+cargo run --package attps_script -- --version
+# or
+cargo run --package attps_script -- -V
+```
+
+## Deployment
 
 Run `sh ./script/deploy.sh` to deploy the program to the devnet.
 Run `sh ./script/deploy.sh --help` to see the help message.
-
-Run `cargo run --package attps_script` to test on-chain (devnet).
