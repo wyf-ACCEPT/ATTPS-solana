@@ -543,8 +543,8 @@ fn main() {
                         AccountMeta::new_readonly(system_program::id(), false),
                     ],
                 )],
-                Some(&owner_pubkey),
-                &[&owner_keypair],
+                Some(&payer_pubkey),
+                &[&payer_keypair],
                 client.get_latest_blockhash().unwrap(),
             );
             match client.send_and_confirm_transaction(&transaction) {

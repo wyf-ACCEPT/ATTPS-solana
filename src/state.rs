@@ -1,6 +1,6 @@
-use std::fmt::{self, Display};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
+use std::fmt::{self, Display};
 
 use crate::error::StateError;
 
