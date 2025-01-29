@@ -31,11 +31,11 @@ pub enum AttpsAccountError {
     PdaAccountAlreadyCreated,
     PdaAccountNotOwned,
     AgentAlreadyRegistered,
-    AgentAlreadyAllowed,
+    AgentAlreadyAllowed = 206,
     AgentAlreadyRemoved,
     AgentNotRegistered,
     InvalidAllowedAgent,
-    InvalidAgentConfig,
+    InvalidAgentConfig = 210,
     DuplicateAgentSettings,
 }
 

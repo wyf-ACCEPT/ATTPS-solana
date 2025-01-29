@@ -52,9 +52,15 @@ pub enum AgentInstruction {
     AcceptAgentSettingProposal,
 
     /// [7] Remove an agent
+    ///
+    /// 0. [signer] owner
+    /// 1. [writable] contract_info
+    /// 2. [writable] agent data account
     RemoveAgent,
 
     /// [8] Verify a message of an agent
+    ///
+    /// 0. [] agent data account
     Verify {
         settings_digest: [u8; 32],
         payload: MessagePayload,

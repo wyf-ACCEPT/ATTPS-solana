@@ -359,10 +359,14 @@ impl Processor {
         contract_info.only_owner(owner_account)?;
 
         let mut agent_info: AgentInfo = DataAccountUtils::read_account_data(agent_account)?;
-        agent_info.is_registered = false;
-        agent_info.is_allowed = false;
-        agent_info.is_removed = true;
-        DataAccountUtils::write_account_data(agent_account, agent_info)
+        if agent_info.is_removed {
+            Err(AttpsAccountError::AgentAlreadyRemoved.into())
+        } else {
+            agent_info.is_registered = false;
+            agent_info.is_allowed = false;
+            agent_info.is_removed = true;
+            DataAccountUtils::write_account_data(agent_account, agent_info)
+        }
     }
 
     fn process_verify(
