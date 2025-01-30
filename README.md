@@ -5,11 +5,10 @@ ATTPS is a Solana program implementing a secure messaging and verification proto
 ## Table of Contents
 - [Overview](#overview)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Building](#building)
-- [Testing](#testing)
-- [Development Workflow](#development-workflow)
+- [Build and Test](#build-and-test)
+- [Deploy and Interact](#deploy-and-interact)
+
+<br>
 
 ## Overview
 
@@ -29,9 +28,9 @@ ATTPS implements a secure messaging protocol with the following key features:
 
 2. **Message Verification**
    - Signature verification using secp256k1
-   - Support for zero-knowledge proofs
-   - Merkle proof verification
    - Multi-signature threshold validation
+   - Support for zero-knowledge proofs (coming soon)
+   - Merkle proof verification (coming soon)
 
 3. **Security Features**
    - UUID validation for message and agent IDs
@@ -39,18 +38,32 @@ ATTPS implements a secure messaging protocol with the following key features:
    - Owner-only administrative operations
    - Threshold-based multi-signature verification
 
+<br>
+
 ## Project Structure
 
-```
-src/
-├── lib.rs           # Module declarations and exports
-├── entrypoint.rs    # Program entry point
-├── state.rs         # Program state and account structures
-├── error.rs         # Custom error definitions
-├── processor.rs     # Instruction processing logic
-├── instructions.rs  # Instruction definitions
-├── constants.rs     # System constants
-└── utils.rs         # Utility functions
+```log
+├── Cargo.lock           # Dependencies lock file
+├── Cargo.toml           # Project(main-package) dependencies and configuration
+├── README.md            # Project documentation
+├── script
+│   ├── Cargo.toml       # Script(sub-package) dependencies and configuration
+│   ├── deploy.sh        # Script for deploying the program
+│   └── interact.rs      # Script for interacting with the program
+└── src
+    ├── constants.rs     # System constants
+    ├── entrypoint.rs    # Program entry point
+    ├── error.rs         # Custom error definitions
+    ├── instruction.rs   # Instruction definitions
+    ├── lib.rs           # Module declarations and exports
+    ├── processor.rs     # Instruction processing logic
+    ├── state.rs         # Program state and account structures
+    ├── test
+    │   ├── instruction_test.rs     # Test for instructions
+    │   ├── state_test.rs           # Test for data structures
+    │   ├── utils_agent_test.rs     # Test for agent utilities functions
+    │   └── utils_manager_test.rs   # Test for manager utilities functions
+    └── utils.rs         # Utility functions
 ```
 
 ### Account Structure
@@ -59,21 +72,11 @@ src/
 - **AgentSettings**: Configuration for each agent
 - **MessagePayload**: Structure for verified messages
 
-## Prerequisites
+<br>
 
-1. **Required Software**
-   - Rust toolchain (latest stable version)
-   - Solana CLI tools (v1.18.26)
+## Build and Test
 
-2. **Development Dependencies**
-   - solana-program = "1.18.26"
-   - borsh = "1.5.3"
-   - hex = "0.4.3"
-   - solana-program-test = "1.18.26"
-   - solana-sdk = "1.18.26"
-   - tokio = "1.43.0"
-
-## Installation
+### Prerequisites
 
 1. Install Rust:
 ```bash
@@ -82,7 +85,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 2. Install Solana CLI tools:
 ```bash
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
+sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
 ```
 
 3. Clone and setup the repository:
@@ -91,71 +94,70 @@ git clone <repository-url>
 cd ATTPS-solana
 ```
 
-## Building
+### Building
 
 Build the Solana program:
 ```bash
+# Build the program, using the Solana BPF toolchain
 cargo build-sbf
+
+# If failed, try to build directly
+cargo build
 ```
 
-## Testing
+### Testing
 
 Run all tests:
 ```bash
-# Run all tests with output
+# Run all tests with output, using the Solana BPF toolchain
 cargo test-sbf -- --nocapture
 
-# Run specific test
+# Run specific test, using the Solana BPF toolchain
 cargo test-sbf test_name -- --nocapture
+
+# If failed, try to run directly
+cargo test -- --nocapture
 ```
 
-### Test Organization
-Tests are located in `./src/test/` directory:
-- `instruction_test.rs`: Instruction-related tests
-- `state_test.rs`: State-related tests
+<br>
 
-## Development Workflow
+## Deploy and Interact
 
-1. **Branch Management**
-   - Always pull from `develop` branch
-   - Create PRs targeting the `develop` branch
+After building and testing the program, you should generate a keypair using Solana CLI by running `solana-keygen new`, then deploy the program to the Solana blockchain. You can use the [deploy script](./script/deploy.sh) tool. The usage is as follows:
 
-2. **Code Formatting**
-   ```bash
-   # Format code before committing
-   cargo fmt
-   ```
+```bash
+# Deploy the program to the devnet
+sh ./script/deploy.sh
 
-3. **Commit Messages**
-   Format: `[type] message`
-   Types:
-   - [fix]: Bug fixes
-   - [build]: Build system changes
-   - [feat]: New features
-   - [init]: Initial commits
-   - [test]: Test updates
-   - [doc]: Documentation updates
-   - [perf]: Performance improvements
-   - [clean]: Code cleanup
+# Deploy the program to the mainnet
+sh ./script/deploy.sh --network mainnet
 
-4. **Best Practices**
-   - Format code before committing
-   - Follow existing test patterns
-   - Use descriptive commit messages
-   - Keep PRs focused and well-scoped
+# Deploy the program to the devnet, use a specific keypair
+sh ./script/deploy.sh --keypair ~/.config/solana/id.json
 
+# Print help message
+sh ./script/deploy.sh --help
+```
 
-## Interaction Script Usage
+If you don't have enough $SOL to deploy the program on devnet, you can use this command to get some SOL:
+```bash
+solana airdrop 3 <your-address>
+```
 
-The project includes a command-line tool for interacting with the deployed Solana program. You can use this tool to manage agents and verify messages.
+Remember to set-up the `.env` file by running `cp .env.example .env` first, and then paste the deployed program address to `.env` file. 
 
 ### Available Commands
 
+The project includes a command-line tool for interacting with the deployed Solana program. You can use this tool to manage agents and verify messages.
+
 ```bash
-# Initialize the contract
+# Generate a new keypair (paste the result to `.env` file)
+cargo run --package attps_script -- generate-keypair
+
+# Initialize the contract (only once)
 cargo run --package attps_script -- initialize
 
-# Create a new agent
+# Create a new agent (will get an `agent_id` as the result)
 cargo run --package attps_script -- create-agent
 
 # Register an existing agent
@@ -163,7 +165,7 @@ cargo run --package attps_script -- register-agent -a <ID>
 # or using long form
 cargo run --package attps_script -- register-agent --agent-id <ID>
 
-# Create and register an agent in one transaction
+# Create and register an agent in one transaction (will get an `agent_id` as the result)
 cargo run --package attps_script -- create-and-register-agent
 
 # Accept an agent
@@ -190,18 +192,23 @@ cargo run --package attps_script -- remove-agent --agent-id <ID>
 cargo run --package attps_script -- verify -a <ID> -d <32_BYTE_HEX>
 # or using long form
 cargo run --package attps_script -- verify --agent-id <ID> --settings-digest <32_BYTE_HEX>
+
+# View agent information
+cargo run --package attps_script -- view-agent -a <ID>
+# or using long form
+cargo run --package attps_script -- view-agent --agent-id <ID>
 ```
 
 ### Example Usage
 
 ```bash
-# Create and register a new agent
+# Create and register a new agent (and returned `agent_id` is 4)
 cargo run --package attps_script -- create-and-register-agent
 
 # Accept agent with ID 4
 cargo run --package attps_script -- accept-agent --agent-id 4
 
-# Verify a message from agent 4
+# Verify a message from agent 4 (the `digest` is currently not used, so just put any value)
 cargo run --package attps_script -- verify --agent-id 4 --settings-digest 0100231df1ab9e7cbdea3018c65ddced9598e0a13942cb4480d3798da83dfd2f
 ```
 
@@ -218,8 +225,3 @@ cargo run --package attps_script -- --version
 # or
 cargo run --package attps_script -- -V
 ```
-
-## Deployment
-
-Run `sh ./script/deploy.sh` to deploy the program to the devnet.
-Run `sh ./script/deploy.sh --help` to see the help message.

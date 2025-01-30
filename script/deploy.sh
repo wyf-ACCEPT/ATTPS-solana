@@ -12,7 +12,7 @@ print_usage() {
     echo "Deploy ATTPS program to Solana network"
     echo ""
     echo "Options:"
-    echo "  -n, --network <network>    Solana network to deploy to (devnet/testnet) [default: devnet]"
+    echo "  -n, --network <network>    Solana network to deploy to (devnet/testnet/mainnet) [default: devnet]"
     echo "  -k, --keypair <path>       Path to deployer keypair [default: ~/.config/solana/id.json]"
     echo "  -h, --help                 Show this help message"
 }
