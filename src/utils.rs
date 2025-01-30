@@ -1,3 +1,6 @@
+/// Utility modules for the ATTPS (AgentText Transfer Protocol Secure) program.
+/// Provides core functionality for account management, cryptographic operations,
+/// and agent-related validations.
 use crate::error::{AgentHeaderError, AttpsAccountError, VerificationError};
 use crate::state::{AgentHeader, AgentSettings, MessageType, Priority};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -13,40 +16,51 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
 };
 
+/// Handles Solana account creation, data serialization, and ownership validation
 pub struct DataAccountUtils;
+/// Provides cryptographic utilities including signature verification and address conversion
 pub struct AgentUtils;
+/// Manages agent-specific operations including UUID validation and settings management
 pub struct AgentManagerUtils;
 
 impl DataAccountUtils {
+    /// Creates a Program Derived Address (PDA) account with specified parameters
+    /// 
+    /// # Arguments
+    /// * `program_id` - The program that will own the account
+    /// * `payer_account` - Account that will pay for the new account creation
+    /// * `target_account` - Account to be created as a PDA
+    /// * `prefix` - Seed prefix for PDA derivation
+    /// * `phrase` - Additional seed for PDA derivation
+    /// * `data_length` - Size of the account data in bytes
     pub fn create_related_account<'a>(
         program_id: &Pubkey,
         payer_account: &AccountInfo<'a>,
-        map_account: &AccountInfo<'a>,
+        target_account: &AccountInfo<'a>,
         prefix: &[u8],
         phrase: &[u8],
         data_length: usize,
     ) -> ProgramResult {
-        let (pda_pubkey, bump) = Pubkey::find_program_address(&[prefix, phrase], program_id);
-        if pda_pubkey != *map_account.key {
+        let (pda_pubkey, bump_seed) = Pubkey::find_program_address(&[prefix, phrase], program_id);
+        if pda_pubkey != *target_account.key {
             Err(AttpsAccountError::PdaAccountMismatch.into())
-        } else if !map_account.is_writable {
+        } else if !target_account.is_writable {
             Err(AttpsAccountError::PdaAccountNotWritable.into())
-        } else if !map_account.data_is_empty() {
+        } else if !target_account.data_is_empty() {
             Err(AttpsAccountError::PdaAccountAlreadyCreated.into())
         } else {
-            println!("\trent get: {:?}", Rent::get());
             let rent = Rent::get()?;
-            let rent_lamports = rent.minimum_balance(data_length);
+            let required_lamports = rent.minimum_balance(data_length);
             invoke_signed(
                 &system_instruction::create_account(
                     payer_account.key,
-                    map_account.key,
-                    rent_lamports,
+                    target_account.key,
+                    required_lamports,
                     data_length as u64,
                     program_id,
                 ),
-                &[payer_account.clone(), map_account.clone()],
-                &[&[prefix.as_ref(), phrase.as_ref(), &[bump]]],
+                &[payer_account.clone(), target_account.clone()],
+                &[&[prefix.as_ref(), phrase.as_ref(), &[bump_seed]]],
             )
         }
     }
@@ -108,6 +122,18 @@ impl AgentUtils {
     }
 
     /// Verify a signature proof against a message hash
+    /// Verifies a multi-signature proof against a message hash
+    /// 
+    /// # Arguments
+    /// * `_settings_digest` - Reserved for future use in settings verification
+    /// * `message_hash` - 32-byte keccak256 hash of the message to verify
+    /// * `signature_proof` - Concatenated signatures, each 65 bytes [r(32) || s(32) || v(1)]
+    /// * `allowed_signers` - List of Ethereum addresses allowed to sign
+    /// * `threshold` - Minimum number of valid signatures required
+    /// 
+    /// # Returns
+    /// * `Ok(())` if verification succeeds
+    /// * `Err(ProgramError)` if verification fails
     pub fn verify_signature(
         _settings_digest: &[u8; 32],
         message_hash: &[u8; 32],
@@ -115,38 +141,38 @@ impl AgentUtils {
         allowed_signers: &Vec<[u8; 20]>,
         threshold: u8,
     ) -> Result<(), ProgramError> {
-        // Check empty proof
+        // Verify proof is not empty
         if signature_proof.is_empty() {
             return Err(VerificationError::InvalidSignatureProof.into());
         }
 
-        // Check proof format. Each signature is 65 bytes: [r(32) || s(32) || v(1)]
+        // Verify proof format (each signature is 65 bytes)
         if signature_proof.len() % 65 != 0 {
             return Err(VerificationError::InvalidSignatureProof.into());
         }
 
-        let sig_count = signature_proof.len() / 65;
-        let mut seen_signatures = Vec::new();
+        let signature_count = signature_proof.len() / 65;
+        let mut processed_signatures = Vec::new();
 
         // Check for duplicate signatures first
-        for i in 0..sig_count {
+        for i in 0..signature_count {
             let start = i * 65;
             let sig = &signature_proof[start..start + 65];
-            if seen_signatures.contains(&sig.to_vec()) {
+            if processed_signatures.contains(&sig.to_vec()) {
                 return Err(VerificationError::DuplicateSigner.into());
             }
-            seen_signatures.push(sig.to_vec());
+            processed_signatures.push(sig.to_vec());
         }
 
         // Check threshold after duplicate check
-        if sig_count < threshold as usize {
+        if signature_count < threshold as usize {
             return Err(VerificationError::InvalidThreshold.into());
         }
 
         let mut valid_signers = Vec::new();
 
         // Process each signature
-        for i in 0..sig_count {
+        for i in 0..signature_count {
             let start = i * 65;
 
             // Extract r, s, v components
