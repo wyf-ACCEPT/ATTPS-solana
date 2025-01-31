@@ -174,12 +174,11 @@ pub struct ContractInfo {
 /// - is_registered: 1 byte (bool)
 /// - is_allowed: 1 byte (bool)
 /// - is_removed: 1 byte (bool)
-/// - is_new_settings: 1 byte (bool)
 /// - agent_settings: See AgentSettings struct size calculation
 /// - pending_settings: See AgentSettings struct size calculation
 /// - agent_config: See AgentConfig struct size calculation
 ///
-/// Total size = 20 + 2 * settings_size + config_size
+/// Total size = 19 + 2 * settings_size + config_size
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct AgentInfo {
     pub agent_id: u128, // Unique auto-incrementing identifier
